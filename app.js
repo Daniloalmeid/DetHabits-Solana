@@ -114,24 +114,28 @@ class DetHabitsApp {
         this.showLoading('Conectando carteira...');
 
         try {
-            // Tenta conectar com Phantom diretamente (desktop ou mobile)
+            // Verifica se o Phantom está disponível (desktop)
             if (window.solana && window.solana.isPhantom) {
                 const response = await window.solana.connect();
                 this.wallet = response.publicKey.toString();
             } else {
-                // Usa WalletConnect para conexão automática
-                const WalletConnectProvider = window.WalletConnectProvider.default;
-                if (WalletConnectProvider) {
-                    const walletConnectProvider = new WalletConnectProvider({
-                        rpc: { "solana": "https://api.mainnet-beta.solana.com" },
-                        chainId: 103, // Mainnet-beta
-                        appName: "DetHabits",
-                        appUrl: "https://daniloalmeid.github.io/DetHabits-Solana/",
-                    });
-                    await walletConnectProvider.enable();
-                    this.wallet = (await walletConnectProvider.getAccounts())[0].toString();
-                } else {
-                    throw new Error('WalletConnect não disponível. Verifique os scripts no index.html.');
+                // Lógica para mobile: tenta abrir o app Phantom via deep link otimizado
+                const redirectUrl = encodeURIComponent('https://daniloalmeid.github.io/DetHabits-Solana/');
+                const deepLink = `phantom://connect?redirect=${redirectUrl}&dapp_name=DetHabits&dapp_url=${encodeURIComponent('https://daniloalmeid.github.io/DetHabits-Solana/')}&action=connect&cluster=mainnet-beta`;
+                console.log('Tentativa de deep link:', deepLink);
+                const startTime = Date.now();
+                window.location.href = deepLink;
+                console.log('Deep link disparado. Tempo inicial:', startTime);
+
+                // Aguarda retorno (20 segundos)
+                await new Promise((resolve) => setTimeout(resolve, 20000));
+                const endTime = Date.now();
+                console.log('Tempo decorrido:', (endTime - startTime) / 1000, 'segundos');
+
+                if (!this.wallet) {
+                    this.hideLoading();
+                    console.log('Falha na conexão automática. Verifique se o Phantom abriu.');
+                    this.showToast('A conexão automática falhou. Verifique se o Phantom abriu e aceite a conexão. Se não abriu, tente novamente ou use https://daniloalmeid.github.io/DetHabits-Solana/ no navegador interno do Phantom.', 'info');
                 }
             }
 
@@ -148,7 +152,7 @@ class DetHabitsApp {
         } catch (error) {
             this.hideLoading();
             console.error('Erro de conexão com a carteira:', error.message || error);
-            this.showToast('Erro ao conectar carteira automaticamente. Tente novamente ou use https://daniloalmeid.github.io/DetHabits-Solana/ no navegador interno do Phantom.', 'error');
+            this.showToast('Erro ao conectar carteira. Reinicie o app Phantom, atualize-o, ou use https://daniloalmeid.github.io/DetHabits-Solana/ no navegador interno.', 'error');
         }
     }
 
