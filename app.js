@@ -566,3 +566,51 @@ setInterval(() => {
         window.app.saveUserData();
     }
 }, 30000); // Save every 30 seconds
+
+
+
+async connectWallet() {
+    this.showLoading('Conectando carteira...');
+
+    try {
+        // Verifica se a Solflare ou Phantom está disponível
+        if (window.solflare && window.solflare.isSolflare) {
+            const response = await window.solflare.connect();
+            this.wallet = response.publicKey.toString();
+        } else if (window.solana && window.solana.isPhantom) {
+            const response = await window.solana.connect();
+            this.wallet = response.publicKey.toString();
+        } else {
+            // Lógica para mobile: tenta abrir a Solflare via deep link
+            const redirectUrl = encodeURIComponent('https://daniloalmeid.github.io/DetHabits-Solana/');
+            const deepLink = `solflare://connect?redirect=${redirectUrl}&dapp_name=DetHabits&dapp_url=${encodeURIComponent('https://daniloalmeid.github.io/DetHabits-Solana/')}&action=connect`;
+            console.log('Abrindo deep link Solflare:', deepLink);
+            window.location.href = deepLink;
+            console.log('Deep link Solflare disparado');
+
+            // Aguarda retorno (15 segundos)
+            await new Promise((resolve) => setTimeout(resolve, 15000));
+
+            if (!this.wallet) {
+                this.hideLoading();
+                console.log('Falha na conexão automática. Verifique o app Solflare para detalhes.');
+                this.showToast('A conexão automática falhou. Abra https://daniloalmeid.github.io/DetHabits-Solana/ no navegador interno do app Solflare e confirme a conexão.', 'info');
+            }
+        }
+
+        // Se conectado com sucesso
+        if (this.wallet) {
+            this.showToast('Carteira conectada com sucesso!', 'success');
+            this.navigateTo('missions');
+            this.loadUserData();
+            this.updateWalletDisplay();
+            this.updateUI();
+        }
+        this.hideLoading();
+
+    } catch (error) {
+        this.hideLoading();
+        console.error('Erro de conexão com a carteira:', error.message || error);
+        this.showToast('Erro ao conectar carteira. Reinicie o app Solflare ou use o navegador interno do app.', 'error');
+    }
+}
