@@ -121,20 +121,20 @@ class DetHabitsApp {
             } else {
                 // Lógica para mobile: tenta abrir o app Phantom via deep link
                 const redirectUrl = encodeURIComponent(window.location.href);
-                const deepLink = `phantom://connect?redirect=${redirectUrl}&dapp_name=DetHabits&dapp_url=${encodeURIComponent(window.location.origin)}`;
+                const deepLink = `phantom://connect?redirect=${redirectUrl}&dapp_name=DetHabits&dapp_url=${encodeURIComponent('https://daniloalmeid.github.io/DetHabits-Solana/')}&action=connect`;
                 console.log('Abrindo deep link:', deepLink);
                 window.location.href = deepLink;
                 console.log('Deep link disparado');
 
-                // Aguarda um retorno (timeout de 10 segundos)
+                // Aguarda um retorno (timeout de 15 segundos)
                 return new Promise((resolve) => {
                     setTimeout(() => {
                         if (!this.wallet) {
                             this.hideLoading();
-                            this.showToast('A conexão não foi concluída. Confirme a conexão no app Phantom. Se falhar, abra esta URL no navegador interno do Phantom: ' + window.location.href, 'info');
+                            this.showToast('A conexão não foi concluída. Confirme a conexão no app Phantom e, se necessário, abra esta URL no navegador interno do Phantom: https://daniloalmeid.github.io/DetHabits-Solana/', 'info');
                         }
                         resolve();
-                    }, 10000); // 10 segundos de timeout
+                    }, 15000); // Aumentado para 15 segundos
                 });
             }
 
