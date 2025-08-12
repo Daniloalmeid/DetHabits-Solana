@@ -112,37 +112,39 @@ class DetHabitsApp {
 
     async connectWallet() {
         this.showLoading('Conectando carteira...');
-        
+
         try {
-            // Check if Phantom wallet is available
-            if (!window.solana || !window.solana.isPhantom) {
-                this.hideLoading();
-                this.showToast('Phantom wallet não encontrada. Instale a extensão Phantom.', 'error');
-                return;
+            // Verifica se o Phantom está disponível (desktop)
+            if (window.solana && window.solana.isPhantom) {
+                const response = await window.solana.connect();
+                this.wallet = response.publicKey.toString();
+            } else {
+                // Lógica para mobile: tenta abrir o app Phantom via deep link
+                const redirectUrl = encodeURIComponent(window.location.href);
+                const deepLink = `phantom://connect?redirect=${redirectUrl}`;
+                window.location.href = deepLink;
+
+                // Aguarda um retorno (opcional, dependendo da implementação do Phantom)
+                setTimeout(() => {
+                    if (!this.wallet) {
+                        this.showToast('Abra o app Phantom para completar a conexão.', 'info');
+                    }
+                }, 2000);
+                return; // Sai da função para evitar continuar sem conexão
             }
 
-            // Connect to Phantom
-            const response = await window.solana.connect();
-            this.wallet = response.publicKey.toString();
-            
-            // Show success message
+            // Se conectado com sucesso (desktop ou mobile retornou)
             this.showToast('Carteira conectada com sucesso!', 'success');
-            
-            // Navigate to missions page
             this.navigateTo('missions');
-            
-            // Load user data for this wallet
             this.loadUserData();
-            
-            // Update UI
             this.updateWalletDisplay();
             this.updateUI();
             this.hideLoading();
-            
+
         } catch (error) {
             this.hideLoading();
             console.error('Wallet connection error:', error);
-            this.showToast('Erro ao conectar carteira. Tente novamente.', 'error');
+            this.showToast('Erro ao conectar carteira. Tente novamente ou verifique o app Phantom.', 'error');
         }
     }
 
