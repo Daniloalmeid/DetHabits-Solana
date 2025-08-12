@@ -132,7 +132,7 @@ class DetHabitsApp {
                 if (!this.wallet) {
                     this.hideLoading();
                     console.log('Falha na conexão automática. Verifique o app Phantom para detalhes.');
-                    this.showToast('A conexão automática falhou. Por favor, abra https://daniloalmeid.github.io/DetHabits-Solana/ no navegador interno do app Phantom, confirme a conexão e aceite a assinatura, se solicitado.', 'info');
+                    this.showToast('A conexão automática falhou com erro no Phantom. Por favor, abra https://daniloalmeid.github.io/DetHabits-Solana/ no navegador interno do app Phantom, reinicie o app se necessário, e confirme a conexão.', 'info');
                 }
             }
 
@@ -148,8 +148,8 @@ class DetHabitsApp {
 
         } catch (error) {
             this.hideLoading();
-            console.error('Erro de conexão com a carteira:', error);
-            this.showToast('Erro ao conectar carteira. Tente novamente, reinicie o app Phantom ou abra https://daniloalmeid.github.io/DetHabits-Solana/ no navegador interno do Phantom.', 'error');
+            console.error('Erro de conexão com a carteira:', error.message || error);
+            this.showToast('Erro ao conectar carteira. Reinicie o app Phantom, atualize-o, ou abra https://daniloalmeid.github.io/DetHabits-Solana/ no navegador interno do Phantom.', 'error');
         }
     }
 
