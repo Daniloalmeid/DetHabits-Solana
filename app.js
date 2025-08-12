@@ -119,45 +119,36 @@ class DetHabitsApp {
                 const response = await window.solana.connect();
                 this.wallet = response.publicKey.toString();
             } else {
-                // Tenta conexão via deep link para mobile
+                // Lógica para mobile: tenta abrir o app Phantom via deep link
                 const redirectUrl = encodeURIComponent('https://daniloalmeid.github.io/DetHabits-Solana/');
                 const deepLink = `phantom://connect?redirect=${redirectUrl}&dapp_name=DetHabits&dapp_url=${encodeURIComponent('https://daniloalmeid.github.io/DetHabits-Solana/')}&action=connect`;
                 console.log('Abrindo deep link:', deepLink);
                 window.location.href = deepLink;
                 console.log('Deep link disparado');
 
-                // Aguarda retorno (15 segundos)
+                // Aguarda retorno (15 segundos) e verifica conexão
                 await new Promise((resolve) => setTimeout(resolve, 15000));
 
-                // Se ainda não conectado, tenta WalletConnect
                 if (!this.wallet) {
-                    console.log('Tentando WalletConnect...');
-                    const WalletConnectProvider = window.WalletConnectProvider.default;
-                    if (WalletConnectProvider) {
-                        const walletConnectProvider = new WalletConnectProvider({
-                            rpc: { "solana": "https://api.mainnet-beta.solana.com" },
-                            chainId: 103, // Chain ID para Solana Mainnet
-                        });
-                        await walletConnectProvider.enable();
-                        this.wallet = (await walletConnectProvider.getAccounts())[0].toString();
-                    } else {
-                        throw new Error('WalletConnect não disponível. Adicione a biblioteca WalletConnect.');
-                    }
+                    this.hideLoading();
+                    this.showToast('A conexão automática falhou. Por favor, abra https://daniloalmeid.github.io/DetHabits-Solana/ diretamente no navegador interno do app Phantom e confirme a conexão lá.', 'info');
                 }
             }
 
             // Se conectado com sucesso
-            this.showToast('Carteira conectada com sucesso!', 'success');
-            this.navigateTo('missions');
-            this.loadUserData();
-            this.updateWalletDisplay();
-            this.updateUI();
+            if (this.wallet) {
+                this.showToast('Carteira conectada com sucesso!', 'success');
+                this.navigateTo('missions');
+                this.loadUserData();
+                this.updateWalletDisplay();
+                this.updateUI();
+            }
             this.hideLoading();
 
         } catch (error) {
             this.hideLoading();
             console.error('Wallet connection error:', error);
-            this.showToast('Erro ao conectar carteira. Confirme no app Phantom ou abra https://daniloalmeid.github.io/DetHabits-Solana/ no navegador interno do Phantom. Se o problema persistir, instale a extensão WalletConnect.', 'error');
+            this.showToast('Erro ao conectar carteira. Tente novamente ou abra https://daniloalmeid.github.io/DetHabits-Solana/ no navegador interno do Phantom.', 'error');
         }
     }
 
