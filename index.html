@@ -1,13 +1,377 @@
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>DetHabits - Solana Missions Platform</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="src/main.tsx"></script>
-  </body>
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DetHabits - Transforme seus hábitos em tokens</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar" id="navbar" style="display: none;">
+        <div class="nav-container">
+            <div class="nav-logo">DetHabits</div>
+            <div class="nav-links">
+                <button class="nav-button" data-page="missions">Missões</button>
+                <button class="nav-button" data-page="wallet">Wallet</button>
+                <button class="nav-button" data-page="shop">Compras</button>
+                <button class="nav-button" data-page="whitepaper">Whitepaper</button>
+                <div class="wallet-info">
+                    <span id="wallet-address"></span>
+                    <button id="disconnect-btn">Desconectar</button>
+                </div>
+            </div>
+            <div class="mobile-menu-btn" id="mobile-menu-btn">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Home Page -->
+    <div id="home-page" class="page active">
+        <div class="hero-container">
+            <div class="hero-content">
+                <div class="logo-container">
+                    <div class="logo">🎯</div>
+                    <h1 class="hero-title">DetHabits</h1>
+                </div>
+                <p class="hero-subtitle">Transforme seus hábitos diários em tokens DET</p>
+                <p class="hero-description">Complete missões, ganhe recompensas e construa uma vida mais saudável enquanto acumula tokens na blockchain Solana.</p>
+                
+                <div class="hero-buttons">
+                    <button id="connect-wallet-btn" class="btn-primary">
+                        <span>🦄</span>
+                        Conectar Carteira Phantom
+                    </button>
+                    <button id="presale-btn" class="btn-secondary">
+                        <span>🚀</span>
+                        Pré-venda
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Missions Page -->
+    <div id="missions-page" class="page">
+        <div class="container">
+            <div class="page-header">
+                <h1>Missões Diárias</h1>
+                <div class="missions-timer">
+                    <span>Renovam em: </span>
+                    <span id="mission-timer">23:45:12</span>
+                </div>
+            </div>
+
+            <div class="missions-grid" id="missions-grid">
+                <!-- Missions will be populated by JavaScript -->
+            </div>
+
+            <div class="daily-summary">
+                <div class="summary-card">
+                    <div class="summary-title">Progresso Diário</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="daily-progress"></div>
+                    </div>
+                    <div class="summary-stats">
+                        <span id="completed-missions">0</span>/5 missões completas
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Wallet Page -->
+    <div id="wallet-page" class="page">
+        <div class="container">
+            <div class="page-header">
+                <h1>Minha Carteira</h1>
+                <div class="wallet-address-display" id="wallet-address-full"></div>
+            </div>
+
+            <div class="wallet-cards">
+                <div class="wallet-card main-balance">
+                    <div class="card-header">
+                        <h3>Saldo Total DET</h3>
+                        <div class="det-icon">🎯</div>
+                    </div>
+                    <div class="balance-amount" id="total-balance">0</div>
+                </div>
+
+                <div class="wallet-card stake-balance">
+                    <div class="card-header">
+                        <h3>Stake Obrigatório</h3>
+                        <div class="stake-info">300% ao ano</div>
+                    </div>
+                    <div class="balance-amount" id="stake-balance">0</div>
+                    <div class="stake-details">
+                        <div class="stake-detail">
+                            <span>Bloqueado por:</span>
+                            <span id="stake-time-left">90 dias</span>
+                        </div>
+                        <div class="stake-detail">
+                            <span>Rendimento diário:</span>
+                            <span id="daily-yield">+0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="wallet-card spending-balance">
+                    <div class="card-header">
+                        <h3>Saldo para Compras</h3>
+                        <div class="spending-info">10% das missões</div>
+                    </div>
+                    <div class="balance-amount" id="spending-balance">0</div>
+                </div>
+            </div>
+
+            <div class="transaction-history">
+                <h3>Histórico de Transações</h3>
+                <div class="history-list" id="transaction-history">
+                    <!-- Transaction history will be populated by JavaScript -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Shop Page -->
+    <div id="shop-page" class="page">
+        <div class="container">
+            <div class="page-header">
+                <h1>Loja DetHabits</h1>
+                <div class="shop-balance">
+                    <span>Saldo disponível: </span>
+                    <span id="shop-balance">0 DET</span>
+                </div>
+            </div>
+
+            <div class="shop-categories">
+                <button class="category-btn active" data-category="all">Todos</button>
+                <button class="category-btn" data-category="accessories">Acessórios</button>
+                <button class="category-btn" data-category="supplements">Suplementos</button>
+                <button class="category-btn" data-category="gear">Equipamentos</button>
+            </div>
+
+            <div class="shop-grid">
+                <div class="shop-item" data-category="accessories">
+                    <div class="item-image">💧</div>
+                    <div class="item-info">
+                        <h4>Garrafa DetHabits</h4>
+                        <p>Garrafa térmica oficial</p>
+                        <div class="item-price">50 DET</div>
+                    </div>
+                    <button class="buy-btn">Comprar</button>
+                </div>
+
+                <div class="shop-item" data-category="supplements">
+                    <div class="item-image">💊</div>
+                    <div class="item-info">
+                        <h4>Multivitamínico</h4>
+                        <p>Suplemento diário completo</p>
+                        <div class="item-price">150 DET</div>
+                    </div>
+                    <button class="buy-btn">Comprar</button>
+                </div>
+
+                <div class="shop-item" data-category="gear">
+                    <div class="item-image">🎯</div>
+                    <div class="item-info">
+                        <h4>Kit Exercícios</h4>
+                        <p>Elásticos e acessórios</p>
+                        <div class="item-price">200 DET</div>
+                    </div>
+                    <button class="buy-btn">Comprar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Whitepaper Page -->
+    <div id="whitepaper-page" class="page">
+        <div class="container">
+            <div class="page-header">
+                <h1>Whitepaper DetHabits</h1>
+                <div class="document-meta">
+                    <span>Versão 1.0 - Janeiro 2025</span>
+                </div>
+            </div>
+
+            <div class="whitepaper-content">
+                <section class="wp-section">
+                    <h2>Introdução</h2>
+                    <p>DetHabits é uma plataforma inovadora que combina desenvolvimento pessoal com tecnologia blockchain, incentivando hábitos saudáveis através de recompensas em tokens DET.</p>
+                </section>
+
+                <section class="wp-section">
+                    <h2>Tokenomics</h2>
+                    <div class="tokenomics-chart">
+                        <div class="token-distribution">
+                            <div class="distribution-item">
+                                <div class="distribution-color" style="background: #3B82F6;"></div>
+                                <span>40% - Recompensas Usuários</span>
+                            </div>
+                            <div class="distribution-item">
+                                <div class="distribution-color" style="background: #10B981;"></div>
+                                <span>30% - Staking Pool</span>
+                            </div>
+                            <div class="distribution-item">
+                                <div class="distribution-color" style="background: #F59E0B;"></div>
+                                <span>20% - Desenvolvimento</span>
+                            </div>
+                            <div class="distribution-item">
+                                <div class="distribution-color" style="background: #8B5CF6;"></div>
+                                <span>10% - Marketing</span>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="wp-section">
+                    <h2>Sistema de Staking</h2>
+                    <p>10% de todos os tokens ganhos são automaticamente direcionados para um pool de staking obrigatório com rendimento de 300% ao ano, bloqueados por 3 meses para garantir sustentabilidade do ecossistema.</p>
+                </section>
+
+                <section class="wp-section">
+                    <h2>Roadmap</h2>
+                    <div class="roadmap">
+                        <div class="roadmap-item completed">
+                            <div class="roadmap-marker"></div>
+                            <div class="roadmap-content">
+                                <h4>Q1 2025</h4>
+                                <p>Lançamento da plataforma e sistema de missões básico</p>
+                            </div>
+                        </div>
+                        <div class="roadmap-item">
+                            <div class="roadmap-marker"></div>
+                            <div class="roadmap-content">
+                                <h4>Q2 2025</h4>
+                                <p>Integração com wearables e API de exercícios</p>
+                            </div>
+                        </div>
+                        <div class="roadmap-item">
+                            <div class="roadmap-marker"></div>
+                            <div class="roadmap-content">
+                                <h4>Q3 2025</h4>
+                                <p>Marketplace e parcerias com marcas fitness</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </div>
+    </div>
+
+    <!-- Presale Page -->
+    <div id="presale-page" class="page">
+        <div class="container">
+            <div class="page-header">
+                <h1>Pré-venda DET Tokens</h1>
+                <div class="presale-status">
+                    <span class="status-badge active">Ativo</span>
+                </div>
+            </div>
+
+            <div class="presale-hero">
+                <div class="presale-info">
+                    <h2>Participe da revolução dos hábitos saudáveis</h2>
+                    <p>Adquira tokens DET com desconto exclusivo na pré-venda e seja um dos primeiros a fazer parte do ecossistema DetHabits.</p>
+                </div>
+
+                <div class="presale-stats">
+                    <div class="stat-card">
+                        <div class="stat-number">50%</div>
+                        <div class="stat-label">Desconto</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number">7</div>
+                        <div class="stat-label">Dias restantes</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number">2.5M</div>
+                        <div class="stat-label">DET vendidos</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="presale-calculator">
+                <h3>Calculadora de Compra</h3>
+                <div class="calculator-form">
+                    <div class="input-group">
+                        <label>Quantidade SOL</label>
+                        <input type="number" id="sol-amount" placeholder="0.00" min="0" step="0.01">
+                    </div>
+                    <div class="conversion-arrow">↓</div>
+                    <div class="input-group">
+                        <label>Receberá DET</label>
+                        <input type="text" id="det-amount" placeholder="0.00" readonly>
+                    </div>
+                    <button class="btn-primary full-width" id="buy-presale-btn">
+                        Comprar na Pré-venda
+                    </button>
+                </div>
+            </div>
+
+            <div class="presale-features">
+                <h3>Vantagens da Pré-venda</h3>
+                <div class="features-grid">
+                    <div class="feature-item">
+                        <div class="feature-icon">💰</div>
+                        <h4>50% de desconto</h4>
+                        <p>Preço especial para early adopters</p>
+                    </div>
+                    <div class="feature-item">
+                        <div class="feature-icon">🎁</div>
+                        <h4>Bônus exclusivos</h4>
+                        <p>NFTs e acesso antecipado a funcionalidades</p>
+                    </div>
+                    <div class="feature-item">
+                        <div class="feature-icon">🔒</div>
+                        <h4>Vesting inteligente</h4>
+                        <p>Liberação gradual com benefícios de staking</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Photo Upload Modal -->
+    <div id="photo-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modal-mission-title">Completar Missão</h3>
+                <button class="close-btn" id="close-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p>Envie uma foto comprovando que você completou esta missão:</p>
+                <div class="photo-upload-area">
+                    <input type="file" id="photo-input" accept="image/*" capture="environment">
+                    <label for="photo-input" class="photo-upload-label">
+                        <div class="upload-icon">📷</div>
+                        <div>Tirar Foto ou Selecionar da Galeria</div>
+                    </label>
+                    <div id="photo-preview"></div>
+                </div>
+                <button id="submit-mission-btn" class="btn-primary full-width" disabled>
+                    Completar Missão (+5 DET)
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="loading-overlay">
+        <div class="loading-spinner"></div>
+        <p>Conectando carteira...</p>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <script src="app.js"></script>
+</body>
 </html>
