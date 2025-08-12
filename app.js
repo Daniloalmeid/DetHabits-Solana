@@ -122,15 +122,20 @@ class DetHabitsApp {
                 // Lógica para mobile: tenta abrir o app Phantom via deep link
                 const redirectUrl = encodeURIComponent(window.location.href);
                 const deepLink = `phantom://connect?redirect=${redirectUrl}`;
+                console.log('Abrindo deep link:', deepLink);
                 window.location.href = deepLink;
+                console.log('Deep link disparado');
 
-                // Aguarda um retorno (opcional, dependendo da implementação do Phantom)
-                setTimeout(() => {
-                    if (!this.wallet) {
-                        this.showToast('Abra o app Phantom para completar a conexão.', 'info');
-                    }
-                }, 2000);
-                return; // Sai da função para evitar continuar sem conexão
+                // Aguarda um retorno (timeout de 5 segundos)
+                return new Promise((resolve) => {
+                    setTimeout(() => {
+                        if (!this.wallet) {
+                            this.hideLoading();
+                            this.showToast('A conexão não foi concluída. Confirme no app Phantom e tente novamente.', 'info');
+                        }
+                        resolve();
+                    }, 5000);
+                });
             }
 
             // Se conectado com sucesso (desktop ou mobile retornou)
