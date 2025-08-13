@@ -132,12 +132,16 @@ class DetHabitsApp {
                 if (!this.wallet) {
                     this.hideLoading();
                     this.showToast('A conexão automática falhou. Por favor, abra https://daniloalmeid.github.io/DetHabits-Solana/ diretamente no navegador interno do app Phantom e confirme a conexão lá.', 'info');
+                    return; // Sai da função se a conexão falhar
                 }
             }
 
             // Se conectado com sucesso
             if (this.wallet) {
                 this.showToast('Carteira conectada com sucesso!', 'success');
+                // Esconde a página inicial permanentemente enquanto conectado
+                document.getElementById('home-page').style.display = 'none';
+                // Mostra a página de missões
                 this.navigateTo('missions');
                 this.loadUserData();
                 this.updateWalletDisplay();
@@ -159,7 +163,9 @@ class DetHabitsApp {
         // Clear current session
         this.wallet = null;
         
-        // Hide navbar and go to home
+        // Restaura a página inicial
+        document.getElementById('home-page').style.display = 'flex';
+        // Esconde a navbar e vai para a página inicial
         document.getElementById('navbar').style.display = 'none';
         this.navigateTo('home');
         
