@@ -67,57 +67,7 @@ class DetHabitsApp {
     }
     
     checkMobileConnection() {
-        // Check if we're returning from Phantom app on mobile
-        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-        
-        if (isMobile) {
-            // Check if we're already inside Phantom browser
-            if (window.solana && window.solana.isPhantom) {
-                // We're in Phantom browser, show connect button
-                setTimeout(() => {
-                    if (!this.wallet) {
-                        this.showToast('Agora você pode conectar sua carteira Phantom', 'info');
-                    }
-                }, 1000);
-            }
-            
-            // Listen for when the page becomes visible again (user returns from Phantom)
-            document.addEventListener('visibilitychange', () => {
-                if (!document.hidden) {
-                    // Page is visible again, check if Phantom is now available
-                    setTimeout(() => {
-                        this.attemptMobileConnection();
-                    }, 1000);
-                }
-            });
-            
-            // Also check on page focus
-            window.addEventListener('focus', () => {
-                setTimeout(() => {
-                    this.attemptMobileConnection();
-                }, 1000);
-            });
-        }
-    }
-    
-    async attemptMobileConnection() {
-        // Only attempt if not already connected and Phantom is available
-        if (!this.wallet && window.solana && window.solana.isPhantom) {
-            try {
-                // Check if already connected
-                if (window.solana.isConnected) {
-                    this.wallet = window.solana.publicKey.toString();
-                    this.showToast('Carteira conectada com sucesso!', 'success');
-                    this.navigateTo('missions');
-                    this.loadUserData();
-                    this.updateWalletDisplay();
-                    this.updateUI();
-                }
-            } catch (error) {
-                // Silent fail - user probably didn't connect
-                console.log('Auto-connection failed:', error);
-            }
-        }
+        // Mobile connection check will be handled in connectWallet method
     }
 
     setupEventListeners() {
@@ -168,79 +118,24 @@ class DetHabitsApp {
     async connectWallet() {
         this.showLoading('Conectando carteira...');
         
-        // Update button text for mobile
-        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-        if (isMobile) {
-            document.getElementById('connect-btn-text').textContent = 'Abrindo Phantom...';
-        }
-        
-        // Update button text for mobile
-        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-        if (isMobile) {
-            document.getElementById('connect-btn-text').textContent = 'Abrindo Phantom...';
-        }
-        
         try {
             // Check if we're on mobile
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
             
             if (isMobile) {
-                // Mobile: redirect to Phantom app
+                // Mobile: redirect to Phantom browser
                 this.hideLoading();
                 
-                // Create deep link to open current URL in Phantom browser
+                // Create the Phantom browser URL
                 const currentUrl = window.location.href;
                 const phantomUrl = `https://phantom.app/ul/browse/${encodeURIComponent(currentUrl)}?ref=https%3A%2F%2Fphantom.app`;
                 
-                // Try to open Phantom app
+                // Open in Phantom browser
                 window.location.href = phantomUrl;
-                
-                // Fallback: show instructions if app doesn't open
-                setTimeout(() => {
-                    this.showToast('Abrindo no navegador Phantom...', 'info');
-                    
-                    // If still on the page after 3 seconds, show install instructions
-                    setTimeout(() => {
-                        if (document.hasFocus()) {
-                            this.showToast('Certifique-se de ter o app Phantom instalado', 'error');
-                            document.getElementById('connect-btn-text').textContent = 'Conectar Carteira Phantom';
-                        }
-                    }, 3000);
-                }, 500);
-                
                 return;
             }
             
-            // Desktop: use extension
-            // Check if we're on mobile
-            
-            if (isMobile) {
-                // Mobile: redirect to Phantom app
-                this.hideLoading();
-                
-                // Create deep link to open current URL in Phantom browser
-                const currentUrl = window.location.href;
-                const phantomUrl = `https://phantom.app/ul/browse/${encodeURIComponent(currentUrl)}?ref=https%3A%2F%2Fphantom.app`;
-                
-                // Try to open Phantom app
-                window.location.href = phantomUrl;
-                
-                // Fallback: show instructions if app doesn't open
-                setTimeout(() => {
-                    this.showToast('Abrindo no navegador Phantom...', 'info');
-                    
-                    // If still on the page after 3 seconds, show install instructions
-                    setTimeout(() => {
-                        if (document.hasFocus()) {
-                            this.showToast('Certifique-se de ter o app Phantom instalado', 'error');
-                            document.getElementById('connect-btn-text').textContent = 'Conectar Carteira Phantom';
-                        }
-                    }, 3000);
-                }, 500);
-                
-                return;
-            }
-            
-            // Desktop: use extension
+            // Desktop: check for Phantom extension
             if (!window.solana || !window.solana.isPhantom) {
                 this.hideLoading();
                 this.showToast('Phantom wallet não encontrada. Instale a extensão Phantom.', 'error');
