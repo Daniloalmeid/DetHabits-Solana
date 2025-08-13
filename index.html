@@ -8,11 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <script src="https://unpkg.com/@walletconnect/web3-provider@latest/dist/umd/index.min.js"></script>
-
-
-    
-   
+    <script src="https://unpkg.com/@solana/web3.js@latest/lib/index.iife.js"></script>
 </head>
 <body>
     <!-- Navigation -->
@@ -48,6 +44,13 @@
                 <p class="hero-subtitle">Transforme seus hábitos diários em tokens DET</p>
                 <p class="hero-description">Complete missões, ganhe recompensas e construa uma vida mais saudável enquanto acumula tokens na blockchain Solana.</p>
                 
+                <!-- Novo texto e botão para celular -->
+                <div class="mobile-instruction">
+                    <p>⚠️ Se você está acessando pelo celular, a conexão automática pode não funcionar. Copie a URL abaixo e cole no navegador interno do app Phantom para conectar sua carteira:</p>
+                    <p id="app-url">https://daniloalmeid.github.io/DetHabits-Solana/</p>
+                    <button id="copy-url-btn">Copiar URL</button>
+                </div>
+
                 <div class="hero-buttons">
                     <button id="connect-wallet-btn" class="btn-primary">
                         <span>🦄</span>
@@ -376,6 +379,19 @@
 
     <!-- Toast Notifications -->
     <div id="toast-container" class="toast-container"></div>
+
+    <!-- Script para copiar a URL -->
+    <script>
+        document.getElementById('copy-url-btn').addEventListener('click', () => {
+            const url = document.getElementById('app-url').textContent;
+            navigator.clipboard.writeText(url).then(() => {
+                alert('URL copiada para a área de transferência!');
+            }).catch(err => {
+                console.error('Falha ao copiar a URL:', err);
+                alert('Falha ao copiar. Tente manualmente.');
+            });
+        });
+    </script>
 
     <script src="app.js"></script>
 </body>
