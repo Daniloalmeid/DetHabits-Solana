@@ -64,6 +64,14 @@ class DetHabitsApp {
         this.startMissionTimer();
         this.loadMissions();
         this.checkMobileConnection();
+        this.showMobileInstructions();
+    }
+    
+    showMobileInstructions() {
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        if (isMobile && !this.wallet) {
+            document.getElementById('mobile-instructions').style.display = 'block';
+        }
     }
     
     checkMobileConnection() {
@@ -71,6 +79,16 @@ class DetHabitsApp {
         const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
         
         if (isMobile) {
+            // Check if we're already inside Phantom browser
+            if (window.solana && window.solana.isPhantom) {
+                // We're in Phantom browser, show connect button
+                setTimeout(() => {
+                    if (!this.wallet) {
+                        this.showToast('Agora você pode conectar sua carteira Phantom', 'info');
+                    }
+                }, 1000);
+            }
+            
             // Listen for when the page becomes visible again (user returns from Phantom)
             document.addEventListener('visibilitychange', () => {
                 if (!document.hidden) {
@@ -102,17 +120,6 @@ class DetHabitsApp {
                     this.loadUserData();
                     this.updateWalletDisplay();
                     this.updateUI();
-                } else {
-                    // Try to connect silently
-                    const response = await window.solana.connect({ onlyIfTrusted: true });
-                    if (response.publicKey) {
-                        this.wallet = response.publicKey.toString();
-                        this.showToast('Carteira conectada com sucesso!', 'success');
-                        this.navigateTo('missions');
-                        this.loadUserData();
-                        this.updateWalletDisplay();
-                        this.updateUI();
-                    }
                 }
             } catch (error) {
                 // Silent fail - user probably didn't connect
@@ -182,21 +189,21 @@ class DetHabitsApp {
                 // Mobile: redirect to Phantom app
                 this.hideLoading();
                 
-                // Create deep link to Phantom app
-                const currentUrl = encodeURIComponent(window.location.href);
-                const phantomUrl = `https://phantom.app/ul/browse/${currentUrl}`;
+                // Create deep link to open current URL in Phantom browser
+                const currentUrl = window.location.href;
+                const phantomUrl = `https://phantom.app/ul/browse/${encodeURIComponent(currentUrl)}?ref=https%3A%2F%2Fphantom.app`;
                 
                 // Try to open Phantom app
                 window.location.href = phantomUrl;
                 
                 // Fallback: show instructions if app doesn't open
                 setTimeout(() => {
-                    this.showToast('Redirecionando para o app Phantom...', 'info');
+                    this.showToast('Abrindo no navegador Phantom...', 'info');
                     
                     // If still on the page after 3 seconds, show install instructions
                     setTimeout(() => {
                         if (document.hasFocus()) {
-                            this.showToast('Instale o app Phantom na App Store ou Google Play', 'error');
+                            this.showToast('Certifique-se de ter o app Phantom instalado', 'error');
                             document.getElementById('connect-btn-text').textContent = 'Conectar Carteira Phantom';
                         }
                     }, 3000);
