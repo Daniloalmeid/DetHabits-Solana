@@ -110,6 +110,10 @@ class DetHabitsApp {
         if (buyPresaleButton) {
             buyPresaleButton.addEventListener('click', () => this.buyPresale());
         }
+        const copyPresaleWalletButton = document.getElementById('copy-presale-wallet-btn');
+        if (copyPresaleWalletButton) {
+            copyPresaleWalletButton.addEventListener('click', () => this.copyPresaleWallet());
+        }
         document.querySelectorAll('.category-btn').forEach(btn => {
             btn.addEventListener('click', (e) => this.filterShopItems(e.target.dataset.category));
         });
@@ -152,6 +156,15 @@ class DetHabitsApp {
             this.showToast('URL copiada para a área de transferência!', 'success');
         }).catch(() => {
             this.showToast('Erro ao copiar a URL.', 'error');
+        });
+    }
+
+    copyPresaleWallet() {
+        const walletAddress = '5mhUnFERAUbES9dmFc1GhsXHHNS5WhKdj9Xw8KZbBzGw';
+        navigator.clipboard.writeText(walletAddress).then(() => {
+            this.showToast('Carteira da pré-venda copiada para a área de transferência!', 'success');
+        }).catch(() => {
+            this.showToast('Erro ao copiar a carteira.', 'error');
         });
     }
 
@@ -503,7 +516,7 @@ class DetHabitsApp {
             item.innerHTML = `
                 <div class="transaction-info">
                     <div class="transaction-icon ${transaction.type}">
-                        ${transaction.type === 'mission' ? '🎯' : transaction.type === 'stake' || transaction.type === 'unstake' ? '🏦' : transaction.type === 'yield' ? '💸' : transaction.type === 'withdraw' ? '↗️' : '🛍️'}
+                        ${transaction.type === 'mission' ? '🎯' : transaction.type === 'stake' || transaction.type === 'unstake' ? '🏦' : transaction.type === 'yield' ? '💸' : transaction.type === 'withdraw' ? '↗️' : transaction.type === 'presale' ? '💰' : '🛍️'}
                     </div>
                     <div class="transaction-details">
                         <h4>${transaction.description}</h4>
@@ -542,21 +555,60 @@ class DetHabitsApp {
     updatePresaleCalculation(event) {
         console.log('Atualizando cálculo de pré-venda');
         const solAmount = parseFloat(event.target.value) || 0;
-        const detAmount = solAmount * 10000;
+        // Simulação: $0.02 por DET, assumindo 1 SOL = $150 USD (valor fixo para teste)
+        const solToUsd = 150; // Substituir por API de preços (ex.: CoinGecko)
+        const usdAmount = solAmount * solToUsd;
+        const detAmount = usdAmount / 0.02; // $0.02 por DET
         const detAmountElement = document.getElementById('det-amount');
         if (detAmountElement) {
-            detAmountElement.value = detAmount.toLocaleString('pt-BR');
+            detAmountElement.value = detAmount.toLocaleString('pt-BR', { maximumFractionDigits: 0 });
         }
     }
 
-    buyPresale() {
+    async buyPresale() {
         console.log('Tentando comprar na pré-venda');
-        const solAmount = document.getElementById('sol-amount').value;
-        if (!solAmount || parseFloat(solAmount) <= 0) {
-            this.showToast('Por favor, insira um valor válido em SOL.', 'error');
+        if (!this.wallet) {
+            this.showToast('Conecte sua carteira Phantom primeiro.', 'error');
             return;
         }
-        this.showToast('Funcionalidade de compra será implementada em breve!', 'info');
+        const solAmount = parseFloat(document.getElementById('sol-amount').value) || 0;
+        const solToUsd = 150; // Simulação: substituir por API de preços
+        const usdAmount = solAmount * solToUsd;
+        const detAmount = usdAmount / 0.02; // $0.02 por DET
+        if (detAmount < 500 || detAmount > 250000) {
+            this.showToast('A compra deve ser entre 500 e 250.000 DET.', 'error');
+            return;
+        }
+        this.showLoading('Processando compra na pré-venda...');
+        try {
+            const connection = new solanaWeb3.Connection(solanaWeb3.clusterApiUrl('devnet'), 'confirmed');
+            const fromPubkey = new solanaWeb3.PublicKey(this.wallet);
+            const toPubkey = new solanaWeb3.PublicKey('5mhUnFERAUbES9dmFc1GhsXHHNS5WhKdj9Xw8KZbBzGw');
+            const lamports = Math.floor(solAmount * solanaWeb3.LAMPORTS_PER_SOL);
+
+            const transaction = new solanaWeb3.Transaction().add(
+                solanaWeb3.SystemProgram.transfer({
+                    fromPubkey: fromPubkey,
+                    toPubkey: toPubkey,
+                    lamports: lamports
+                })
+            );
+
+            const signature = await window.solana.signAndSendTransaction(transaction);
+            await connection.confirmTransaction(signature, 'confirmed');
+            console.log('Transação de pré-venda confirmada:', signature);
+
+            this.addTransaction('presale', `Compra de ${detAmount.toLocaleString('pt-BR')} DET na pré-venda`, detAmount);
+            this.userData.totalBalance += Math.floor(detAmount);
+            this.saveUserData();
+            this.updateWalletPage();
+            this.showToast(`Compra de ${detAmount.toLocaleString('pt-BR')} DET realizada com sucesso!`, 'success');
+        } catch (error) {
+            console.error('Erro na pré-venda:', error);
+            this.showToast('Erro ao processar a compra. Verifique sua carteira e tente novamente.', 'error');
+        } finally {
+            this.hideLoading();
+        }
     }
 
     filterShopItems(category) {
