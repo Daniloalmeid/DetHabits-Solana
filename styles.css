@@ -366,6 +366,7 @@ body {
 }
 
 .mission-card.completed {
+    background: linear-gradient(135deg, #D1FAE5 0%, #A7F3D0 100%); /* Verde bonito restaurado */
     border: 3px solid var(--secondary-green);
 }
 
@@ -583,6 +584,39 @@ body {
 
 .stake-input button {
     padding: 0.5rem 1rem;
+}
+
+.withdraw-container {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+#withdraw-btn {
+    background: var(--red); /* Vermelho por padrão */
+    color: var(--white);
+    border: none;
+    padding: 1rem 2rem;
+    border-radius: var(--border-radius);
+    font-size: 1.1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+#withdraw-btn.enabled {
+    background: var(--secondary-green); /* Verde quando saldo ≥ 800 DET */
+}
+
+#withdraw-btn:hover {
+    opacity: 0.9;
+}
+
+.withdraw-notice {
+    font-size: 0.875rem;
+    color: var(--gray-200);
+    font-weight: 500;
 }
 
 .transaction-history {
@@ -1163,5 +1197,10 @@ body {
 
     .stat-label {
         font-size: 0.8rem;
+    }
+
+    .withdraw-container {
+        flex-direction: column;
+        align-items: flex-start;
     }
 }

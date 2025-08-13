@@ -62,6 +62,7 @@ class DetHabitsApp {
     }
 
     init() {
+        console.log('Inicializando DetHabitsApp...');
         this.loadUserData();
         this.setupEventListeners();
         this.updateUI();
@@ -71,9 +72,12 @@ class DetHabitsApp {
     }
 
     setupEventListeners() {
+        console.log('Configurando event listeners...');
         const connectButton = document.getElementById('connect-wallet-btn');
         if (connectButton) {
             connectButton.addEventListener('click', () => this.connectWallet());
+        } else {
+            console.error('Botão de conexão não encontrado');
         }
         document.querySelectorAll('.nav-button').forEach(btn => {
             btn.addEventListener('click', (e) => this.navigateTo(e.target.dataset.page));
@@ -82,47 +86,93 @@ class DetHabitsApp {
         if (disconnectButton) {
             disconnectButton.addEventListener('click', () => this.disconnectWallet());
         }
-        document.getElementById('presale-btn').addEventListener('click', () => this.navigateTo('presale'));
-        document.getElementById('close-modal').addEventListener('click', () => this.closePhotoModal());
-        document.getElementById('photo-input').addEventListener('change', (e) => this.handlePhotoSelect(e));
-        document.getElementById('submit-mission-btn').addEventListener('click', () => this.completeMission());
-        document.getElementById('sol-amount').addEventListener('input', (e) => this.updatePresaleCalculation(e));
-        document.getElementById('buy-presale-btn').addEventListener('click', () => this.buyPresale());
+        const presaleButton = document.getElementById('presale-btn');
+        if (presaleButton) {
+            presaleButton.addEventListener('click', () => this.navigateTo('presale'));
+        }
+        const closeModalButton = document.getElementById('close-modal');
+        if (closeModalButton) {
+            closeModalButton.addEventListener('click', () => this.closePhotoModal());
+        }
+        const photoInput = document.getElementById('photo-input');
+        if (photoInput) {
+            photoInput.addEventListener('change', (e) => this.handlePhotoSelect(e));
+        }
+        const submitMissionButton = document.getElementById('submit-mission-btn');
+        if (submitMissionButton) {
+            submitMissionButton.addEventListener('click', () => this.completeMission());
+        }
+        const solAmountInput = document.getElementById('sol-amount');
+        if (solAmountInput) {
+            solAmountInput.addEventListener('input', (e) => this.updatePresaleCalculation(e));
+        }
+        const buyPresaleButton = document.getElementById('buy-presale-btn');
+        if (buyPresaleButton) {
+            buyPresaleButton.addEventListener('click', () => this.buyPresale());
+        }
         document.querySelectorAll('.category-btn').forEach(btn => {
             btn.addEventListener('click', (e) => this.filterShopItems(e.target.dataset.category));
         });
         document.querySelectorAll('.buy-btn').forEach(btn => {
             btn.addEventListener('click', (e) => this.buyItem(e));
         });
-        document.getElementById('mobile-menu-btn').addEventListener('click', () => this.toggleMobileMenu());
-        document.getElementById('photo-modal').addEventListener('click', (e) => {
-            if (e.target === e.currentTarget) {
-                this.closePhotoModal();
-            }
-        });
+        const mobileMenuButton = document.getElementById('mobile-menu-btn');
+        if (mobileMenuButton) {
+            mobileMenuButton.addEventListener('click', () => this.toggleMobileMenu());
+        }
+        const photoModal = document.getElementById('photo-modal');
+        if (photoModal) {
+            photoModal.addEventListener('click', (e) => {
+                if (e.target === e.currentTarget) {
+                    this.closePhotoModal();
+                }
+            });
+        }
         const withdrawButton = document.getElementById('withdraw-btn');
         if (withdrawButton) {
             withdrawButton.addEventListener('click', () => this.withdrawToSolana());
         }
-        document.getElementById('stake-voluntary-btn').addEventListener('click', () => this.stakeVoluntary());
-        document.getElementById('unstake-voluntary-btn').addEventListener('click', () => this.unstakeVoluntary());
+        const stakeVoluntaryButton = document.getElementById('stake-voluntary-btn');
+        if (stakeVoluntaryButton) {
+            stakeVoluntaryButton.addEventListener('click', () => this.stakeVoluntary());
+        }
+        const unstakeVoluntaryButton = document.getElementById('unstake-voluntary-btn');
+        if (unstakeVoluntaryButton) {
+            unstakeVoluntaryButton.addEventListener('click', () => this.unstakeVoluntary());
+        }
+        const copyUrlButton = document.getElementById('copy-url-btn');
+        if (copyUrlButton) {
+            copyUrlButton.addEventListener('click', () => this.copyAppUrl());
+        }
+    }
+
+    copyAppUrl() {
+        const appUrl = document.getElementById('app-url').textContent;
+        navigator.clipboard.writeText(appUrl).then(() => {
+            this.showToast('URL copiada para a área de transferência!', 'success');
+        }).catch(() => {
+            this.showToast('Erro ao copiar a URL.', 'error');
+        });
     }
 
     async connectWallet() {
+        console.log('Tentando conectar carteira...');
         this.showLoading('Conectando carteira...');
         try {
-            // Verifica se está no celular
             const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-            
-            if (!window.solana) {
+            console.log('Ambiente detectado:', isMobile ? 'Mobile' : 'Desktop');
+
+            if (!window.solana || !window.solana.isPhantom) {
+                console.warn('Phantom Wallet não detectado.');
                 this.hideLoading();
                 if (isMobile) {
                     this.showToast(
-                        'Por favor, abra esta URL no navegador interno do Phantom: https://daniloalmeid.github.io/DetHabits-Solana/',
+                        'Abra esta URL no navegador interno do Phantom: https://daniloalmeid.github.io/DetHabits-Solana/',
                         'info'
                     );
                     const redirectUrl = encodeURIComponent('https://daniloalmeid.github.io/DetHabits-Solana/');
                     const deepLink = `phantom://connect?app_url=${redirectUrl}&dapp_name=DetHabits`;
+                    console.log('Redirecionando para deep link:', deepLink);
                     window.location.href = deepLink;
                 } else {
                     this.showToast('Por favor, instale a extensão Phantom no seu navegador.', 'error');
@@ -130,24 +180,17 @@ class DetHabitsApp {
                 return;
             }
 
-            if (window.solana && window.solana.isPhantom) {
-                try {
-                    const response = await window.solana.connect({ onlyIfTrusted: false });
-                    this.wallet = response.publicKey.toString();
-                    this.showToast('Carteira conectada com sucesso!', 'success');
-                    
-                    // Após conexão bem-sucedida
-                    document.getElementById('home-page').style.display = 'none';
-                    this.navigateTo('missions');
-                    this.loadUserData();
-                    this.updateWalletDisplay();
-                    this.updateUI();
-                } catch (error) {
-                    throw new Error('Falha ao conectar com Phantom: ' + error.message);
-                }
-            } else {
-                throw new Error('Phantom Wallet não detectado.');
-            }
+            console.log('Conectando com Phantom Wallet...');
+            const response = await window.solana.connect({ onlyIfTrusted: false });
+            this.wallet = response.publicKey.toString();
+            console.log('Carteira conectada:', this.wallet);
+            this.showToast('Carteira conectada com sucesso!', 'success');
+
+            document.getElementById('home-page').style.display = 'none';
+            this.navigateTo('missions');
+            this.loadUserData();
+            this.updateWalletDisplay();
+            this.updateUI();
         } catch (error) {
             console.error('Erro ao conectar carteira:', error);
             this.showToast(
@@ -155,11 +198,13 @@ class DetHabitsApp {
                 'error'
             );
         } finally {
+            console.log('Finalizando tentativa de conexão');
             this.hideLoading();
         }
     }
 
     disconnectWallet() {
+        console.log('Desconectando carteira...');
         this.saveUserData();
         this.wallet = null;
         document.getElementById('home-page').style.display = 'block';
@@ -169,25 +214,35 @@ class DetHabitsApp {
     }
 
     updateWalletDisplay() {
-        if (this.wallet) {
-            document.getElementById('navbar').style.display = 'block';
-            const walletAddressElement = document.getElementById('wallet-address');
-            if (walletAddressElement) {
-                walletAddressElement.textContent = 
-                    `${this.wallet.substring(0, 4)}...${this.wallet.substring(this.wallet.length - 4)}`;
-            }
-            const walletAddressFullElement = document.getElementById('wallet-address-full');
-            if (walletAddressFullElement) {
-                walletAddressFullElement.textContent = this.wallet;
-            }
+        if (!this.wallet) {
+            console.log('Nenhuma carteira conectada, pulando atualização de display');
+            return;
+        }
+        console.log('Atualizando display da carteira:', this.wallet);
+        document.getElementById('navbar').style.display = 'block';
+        const walletAddressElement = document.getElementById('wallet-address');
+        if (walletAddressElement) {
+            walletAddressElement.textContent = 
+                `${this.wallet.substring(0, 4)}...${this.wallet.substring(this.wallet.length - 4)}`;
+        } else {
+            console.error('Elemento wallet-address não encontrado');
+        }
+        const walletAddressFullElement = document.getElementById('wallet-address-full');
+        if (walletAddressFullElement) {
+            walletAddressFullElement.textContent = this.wallet;
+        } else {
+            console.error('Elemento wallet-address-full não encontrado');
         }
     }
 
     navigateTo(page) {
+        console.log('Navegando para a página:', page);
         document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
         const pageElement = document.getElementById(`${page}-page`);
         if (pageElement) {
             pageElement.classList.add('active');
+        } else {
+            console.error(`Página ${page}-page não encontrada`);
         }
         document.querySelectorAll('.nav-button').forEach(btn => btn.classList.remove('active'));
         const navButton = document.querySelector(`[data-page="${page}"]`);
@@ -205,6 +260,7 @@ class DetHabitsApp {
     }
 
     loadMissions() {
+        console.log('Carregando missões...');
         const missionsGrid = document.getElementById('missions-grid');
         if (missionsGrid) {
             missionsGrid.innerHTML = '';
@@ -213,6 +269,8 @@ class DetHabitsApp {
                 missionsGrid.appendChild(missionCard);
             });
             this.updateMissionProgress();
+        } else {
+            console.error('Elemento missions-grid não encontrado');
         }
     }
 
@@ -238,8 +296,12 @@ class DetHabitsApp {
     }
 
     openPhotoModal(missionId) {
+        console.log('Abrindo modal de foto para missão:', missionId);
         this.currentMission = this.missions.find(m => m.id === missionId);
-        if (!this.currentMission || this.currentMission.completed) return;
+        if (!this.currentMission || this.currentMission.completed) {
+            console.warn('Missão não encontrada ou já completada');
+            return;
+        }
         const modalTitle = document.getElementById('modal-mission-title');
         if (modalTitle) {
             modalTitle.textContent = this.currentMission.title;
@@ -248,7 +310,10 @@ class DetHabitsApp {
         if (photoModal) {
             photoModal.classList.add('active');
         }
-        document.getElementById('submit-mission-btn').disabled = true;
+        const submitMissionButton = document.getElementById('submit-mission-btn');
+        if (submitMissionButton) {
+            submitMissionButton.disabled = true;
+        }
         const photoPreview = document.getElementById('photo-preview');
         if (photoPreview) {
             photoPreview.innerHTML = '';
@@ -256,11 +321,15 @@ class DetHabitsApp {
     }
 
     closePhotoModal() {
+        console.log('Fechando modal de foto');
         const photoModal = document.getElementById('photo-modal');
         if (photoModal) {
             photoModal.classList.remove('active');
         }
-        document.getElementById('photo-input').value = '';
+        const photoInput = document.getElementById('photo-input');
+        if (photoInput) {
+            photoInput.value = '';
+        }
         const photoPreview = document.getElementById('photo-preview');
         if (photoPreview) {
             photoPreview.innerHTML = '';
@@ -269,8 +338,12 @@ class DetHabitsApp {
     }
 
     handlePhotoSelect(event) {
+        console.log('Foto selecionada');
         const file = event.target.files[0];
-        if (!file) return;
+        if (!file) {
+            console.warn('Nenhum arquivo selecionado');
+            return;
+        }
         if (!file.type.startsWith('image/')) {
             this.showToast('Por favor, selecione uma imagem válida.', 'error');
             return;
@@ -285,13 +358,20 @@ class DetHabitsApp {
             if (photoPreview) {
                 photoPreview.innerHTML = `<img src="${e.target.result}" alt="Preview da missão">`;
             }
-            document.getElementById('submit-mission-btn').disabled = false;
+            const submitMissionButton = document.getElementById('submit-mission-btn');
+            if (submitMissionButton) {
+                submitMissionButton.disabled = false;
+            }
         };
         reader.readAsDataURL(file);
     }
 
     completeMission() {
-        if (!this.currentMission) return;
+        if (!this.currentMission) {
+            console.warn('Nenhuma missão selecionada');
+            return;
+        }
+        console.log('Completando missão:', this.currentMission.id);
         this.currentMission.completed = true;
         this.userData.completedMissions.push({
             id: this.currentMission.id,
@@ -320,6 +400,7 @@ class DetHabitsApp {
     }
 
     updateMissionProgress() {
+        console.log('Atualizando progresso das missões');
         const completedCount = this.missions.filter(m => m.completed).length;
         const progressPercentage = (completedCount / this.missions.length) * 100;
         const dailyProgress = document.getElementById('daily-progress');
@@ -333,12 +414,17 @@ class DetHabitsApp {
     }
 
     updateMissionsPage() {
+        console.log('Atualizando página de missões');
         this.loadMissions();
         this.updateMissionProgress();
     }
 
     updateWalletPage() {
-        if (!this.wallet) return; // Evita atualização se a carteira não estiver conectada
+        if (!this.wallet) {
+            console.log('Carteira não conectada, pulando atualização da página da wallet');
+            return;
+        }
+        console.log('Atualizando página da wallet');
         const totalBalanceElement = document.getElementById('total-balance');
         if (totalBalanceElement) {
             totalBalanceElement.textContent = this.userData.totalBalance || 0;
@@ -362,15 +448,18 @@ class DetHabitsApp {
         const withdrawBtn = document.getElementById('withdraw-btn');
         if (withdrawBtn) {
             if (this.userData.totalBalance >= 800) {
-                withdrawBtn.style.display = 'block';
+                withdrawBtn.classList.add('enabled');
+                withdrawBtn.disabled = false;
             } else {
-                withdrawBtn.style.display = 'none';
+                withdrawBtn.classList.remove('enabled');
+                withdrawBtn.disabled = true;
             }
         }
         this.loadTransactionHistory();
     }
 
     updateShopPage() {
+        console.log('Atualizando página da loja');
         const shopBalanceElement = document.getElementById('shop-balance');
         if (shopBalanceElement) {
             shopBalanceElement.textContent = `${this.userData.spendingBalance} DET`;
@@ -378,6 +467,7 @@ class DetHabitsApp {
     }
 
     addTransaction(type, description, amount) {
+        console.log('Adicionando transação:', type, description, amount);
         this.userData.transactions.unshift({
             id: Date.now(),
             type,
@@ -391,8 +481,12 @@ class DetHabitsApp {
     }
 
     loadTransactionHistory() {
+        console.log('Carregando histórico de transações');
         const historyContainer = document.getElementById('transaction-history');
-        if (!historyContainer) return;
+        if (!historyContainer) {
+            console.error('Elemento transaction-history não encontrado');
+            return;
+        }
         historyContainer.innerHTML = '';
         if (this.userData.transactions.length === 0) {
             historyContainer.innerHTML = '<p style="text-align: center; color: var(--gray-500); padding: 2rem;">Nenhuma transação encontrada</p>';
@@ -425,6 +519,7 @@ class DetHabitsApp {
     }
 
     startMissionTimer() {
+        console.log('Iniciando temporizador de missões');
         const updateTimer = () => {
             const now = new Date();
             const tomorrow = new Date();
@@ -445,6 +540,7 @@ class DetHabitsApp {
     }
 
     updatePresaleCalculation(event) {
+        console.log('Atualizando cálculo de pré-venda');
         const solAmount = parseFloat(event.target.value) || 0;
         const detAmount = solAmount * 10000;
         const detAmountElement = document.getElementById('det-amount');
@@ -454,6 +550,7 @@ class DetHabitsApp {
     }
 
     buyPresale() {
+        console.log('Tentando comprar na pré-venda');
         const solAmount = document.getElementById('sol-amount').value;
         if (!solAmount || parseFloat(solAmount) <= 0) {
             this.showToast('Por favor, insira um valor válido em SOL.', 'error');
@@ -463,6 +560,7 @@ class DetHabitsApp {
     }
 
     filterShopItems(category) {
+        console.log('Filtrando itens da loja por categoria:', category);
         document.querySelectorAll('.category-btn').forEach(btn => btn.classList.remove('active'));
         const categoryBtn = document.querySelector(`[data-category="${category}"]`);
         if (categoryBtn) {
@@ -478,6 +576,7 @@ class DetHabitsApp {
     }
 
     buyItem(event) {
+        console.log('Comprando item da loja');
         const itemCard = event.target.closest('.shop-item');
         const itemName = itemCard.querySelector('h4').textContent;
         const itemPrice = parseInt(itemCard.querySelector('.item-price').textContent);
@@ -493,6 +592,7 @@ class DetHabitsApp {
     }
 
     toggleMobileMenu() {
+        console.log('Alternando menu móvel');
         const navLinks = document.querySelector('.nav-links');
         if (navLinks) {
             navLinks.classList.toggle('mobile-active');
@@ -504,23 +604,33 @@ class DetHabitsApp {
     }
 
     showLoading(message) {
+        console.log('Exibindo overlay de carregamento:', message);
         const overlay = document.getElementById('loading-overlay');
         if (overlay) {
             overlay.querySelector('p').textContent = message;
             overlay.classList.add('active');
+        } else {
+            console.error('Elemento loading-overlay não encontrado');
         }
     }
 
     hideLoading() {
+        console.log('Ocultando overlay de carregamento');
         const overlay = document.getElementById('loading-overlay');
         if (overlay) {
             overlay.classList.remove('active');
+        } else {
+            console.error('Elemento loading-overlay não encontrado');
         }
     }
 
     showToast(message, type = 'info') {
+        console.log('Exibindo toast:', message, type);
         const toastContainer = document.getElementById('toast-container');
-        if (!toastContainer) return;
+        if (!toastContainer) {
+            console.error('Elemento toast-container não encontrado');
+            return;
+        }
         const toast = document.createElement('div');
         toast.className = `toast ${type}`;
         toast.textContent = message;
@@ -531,7 +641,11 @@ class DetHabitsApp {
     }
 
     loadUserData() {
-        if (!this.wallet) return;
+        if (!this.wallet) {
+            console.log('Nenhuma carteira conectada, pulando carregamento de dados');
+            return;
+        }
+        console.log('Carregando dados do usuário para carteira:', this.wallet);
         const saved = localStorage.getItem(`dethabits_data_${this.wallet}`);
         if (saved) {
             try {
@@ -555,7 +669,7 @@ class DetHabitsApp {
                     });
                 }
             } catch (error) {
-                console.error('Error loading user data:', error);
+                console.error('Erro ao carregar dados do usuário:', error);
                 this.userData = {
                     totalBalance: 0,
                     stakeBalance: 0,
@@ -580,24 +694,36 @@ class DetHabitsApp {
     }
 
     saveUserData() {
-        if (!this.wallet) return;
+        if (!this.wallet) {
+            console.log('Nenhuma carteira conectada, pulando salvamento de dados');
+            return;
+        }
+        console.log('Salvando dados do usuário para carteira:', this.wallet);
         try {
             localStorage.setItem(`dethabits_data_${this.wallet}`, JSON.stringify(this.userData));
         } catch (error) {
-            console.error('Error saving user data:', error);
+            console.error('Erro ao salvar dados do usuário:', error);
         }
     }
 
     updateUI() {
+        console.log('Atualizando UI geral');
         if (this.wallet) {
             this.updateWalletDisplay();
         }
-        this.updateWalletPage();
-        this.updateShopPage();
-        this.updateMissionsPage();
+        if (this.currentPage === 'wallet') {
+            this.updateWalletPage();
+        }
+        if (this.currentPage === 'shop') {
+            this.updateShopPage();
+        }
+        if (this.currentPage === 'missions') {
+            this.updateMissionsPage();
+        }
     }
 
     startYieldUpdater() {
+        console.log('Iniciando atualizador de rendimento');
         setInterval(() => {
             if (this.userData.stakeBalance > 0) {
                 const hourlyYield = Math.floor(this.userData.stakeBalance * this.hourlyYieldRate);
@@ -621,6 +747,7 @@ class DetHabitsApp {
     }
 
     stakeVoluntary() {
+        console.log('Realizando stake voluntário');
         const amountInput = document.getElementById('stake-amount-input');
         const amount = parseInt(amountInput.value);
         if (isNaN(amount) || amount <= 0 || amount > this.userData.totalBalance) {
@@ -637,6 +764,7 @@ class DetHabitsApp {
     }
 
     unstakeVoluntary() {
+        console.log('Retirando stake voluntário');
         if (this.userData.voluntaryStakeBalance <= 0) {
             this.showToast('Nenhum valor em stake voluntário para retirar.', 'error');
             return;
@@ -651,6 +779,7 @@ class DetHabitsApp {
     }
 
     async withdrawToSolana() {
+        console.log('Tentando retirada para Solana');
         if (!this.wallet) {
             this.showToast('Carteira não conectada. Conecte sua carteira Phantom primeiro.', 'error');
             return;
@@ -660,22 +789,49 @@ class DetHabitsApp {
             return;
         }
         try {
-            const connection = new solanaWeb3.Connection(solanaWeb3.clusterApiUrl('devnet'));
+            this.showLoading('Enviando DET para carteira Solana...');
+            // Simulação de transação, pois o endereço de destino e o mint do token não foram fornecidos
+            // Substitua 'TOKEN_MINT_DET_AQUI' pelo endereço real do mint do token DET
+            const connection = new solanaWeb3.Connection(solanaWeb3.clusterApiUrl('devnet'), 'confirmed');
             const fromPubkey = new solanaWeb3.PublicKey(this.wallet);
-            const toPubkey = new solanaWeb3.PublicKey('ENDERECO_DESTINO_AQUI'); // Substitua pelo endereço real
-            const tokenMint = new solanaWeb3.PublicKey('TOKEN_MINT_DET_AQUI'); // Substitua pelo mint do token DET
+            const toPubkey = new solanaWeb3.PublicKey(this.wallet); // Envia para a mesma carteira conectada
+            const tokenMint = new solanaWeb3.PublicKey('TOKEN_MINT_DET_AQUI'); // Substitua pelo mint real
             const fromATA = await splToken.getAssociatedTokenAddress(tokenMint, fromPubkey);
             const toATA = await splToken.getAssociatedTokenAddress(tokenMint, toPubkey);
+
+            // Verifica se a ATA de destino existe; se não, cria
+            const toAccountInfo = await connection.getAccountInfo(toATA);
+            if (!toAccountInfo) {
+                const transaction = new solanaWeb3.Transaction().add(
+                    splToken.createAssociatedTokenAccountInstruction(
+                        fromPubkey,
+                        toATA,
+                        toPubkey,
+                        tokenMint
+                    )
+                );
+                const signature = await window.solana.signAndSendTransaction(transaction);
+                await connection.confirmTransaction(signature, 'confirmed');
+                console.log('Conta de token associada criada:', signature);
+            }
+
+            // Cria a transação de transferência
+            const amount = this.userData.totalBalance * 1e9; // Assumindo 9 decimais para o token DET
             const transaction = new solanaWeb3.Transaction().add(
                 splToken.createTransferInstruction(
                     fromATA,
                     toATA,
                     fromPubkey,
-                    this.userData.totalBalance * 1e9 // Assumindo 9 decimais
+                    amount
                 )
             );
+
+            // Assina e envia a transação
             const signature = await window.solana.signAndSendTransaction(transaction);
-            await connection.confirmTransaction(signature);
+            await connection.confirmTransaction(signature, 'confirmed');
+            console.log('Transação de retirada confirmada:', signature);
+
+            // Atualiza o saldo e registra a transação
             this.addTransaction('withdraw', `Retirada de ${this.userData.totalBalance} DET para carteira Solana`, -this.userData.totalBalance);
             this.userData.totalBalance = 0;
             this.saveUserData();
@@ -684,11 +840,14 @@ class DetHabitsApp {
         } catch (error) {
             console.error('Erro na retirada:', error);
             this.showToast('Erro ao realizar a retirada. Tente novamente.', 'error');
+        } finally {
+            this.hideLoading();
         }
     }
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    console.log('DOM carregado, inicializando app');
     window.app = new DetHabitsApp();
 });
 
