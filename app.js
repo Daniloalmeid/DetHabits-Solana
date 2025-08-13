@@ -256,6 +256,11 @@ class DetHabitsApp {
             navButton.classList.add('active');
         }
         this.currentPage = page;
+        // Fecha o menu móvel automaticamente, se estiver aberto
+        const navLinks = document.querySelector('.nav-links');
+        if (navLinks && navLinks.classList.contains('mobile-active')) {
+            this.toggleMobileMenu();
+        }
         if (page === 'wallet' && this.wallet) {
             this.updateWalletPage();
         } else if (page === 'missions') {
@@ -515,7 +520,7 @@ class DetHabitsApp {
             item.innerHTML = `
                 <div class="transaction-info">
                     <div class="transaction-icon ${transaction.type}">
-                        ${transaction.type === 'mission' ? '🎯' : transaction.type === 'stake' || transaction.type === 'unstake' ? '🏦' : transaction.type === 'yield' ? '💸' : transaction.type === 'withdraw' ? '↗️' : transaction.type === 'presale' ? '💰' : '🛍️'}
+                        ${transaction.type === 'mission' ? '🎯' : transaction.type === 'stake' || transaction.type === 'unstake' ? '🏦' : transaction.type === 'withdraw' ? '↗️' : transaction.type === 'presale' ? '💰' : '🛍️'}
                     </div>
                     <div class="transaction-details">
                         <h4>${transaction.description}</h4>
@@ -880,27 +885,34 @@ class DetHabitsApp {
     startYieldUpdater() {
         console.log('Iniciando atualizador de rendimento a cada 5 minutos');
         setInterval(() => {
+            console.log('Verificando rendimentos...');
             if (this.userData.stakeBalance > 0) {
-                const fiveMinuteYield = Math.floor(this.userData.stakeBalance * this.fiveMinuteYieldRate);
+                const calculatedYield = this.userData.stakeBalance * this.fiveMinuteYieldRate;
+                const fiveMinuteYield = Math.max(1, Math.floor(calculatedYield)); // Garante pelo menos 1 DET
+                console.log(`Rendimento stake obrigatório: ${fiveMinuteYield} DET (calculado: ${calculatedYield})`);
                 this.userData.stakeBalance += fiveMinuteYield;
-                this.addTransaction('yield', 'Rendimento de 5 minutos stake obrigatório', fiveMinuteYield);
                 this.saveUserData();
                 this.backupUserData();
+                this.updateUI();
                 if (this.currentPage === 'wallet') {
-                    this.updateWalletPage();
                     this.showToast(`+${fiveMinuteYield} DET adicionados ao stake obrigatório!`, 'success');
                 }
+            } else {
+                console.log('Nenhum saldo em stake obrigatório, pulando atualização');
             }
             if (this.userData.voluntaryStakeBalance > 0) {
-                const fiveMinuteYield = Math.floor(this.userData.voluntaryStakeBalance * this.fiveMinuteYieldRate);
+                const calculatedYield = this.userData.voluntaryStakeBalance * this.fiveMinuteYieldRate;
+                const fiveMinuteYield = Math.max(1, Math.floor(calculatedYield)); // Garante pelo menos 1 DET
+                console.log(`Rendimento stake voluntário: ${fiveMinuteYield} DET (calculado: ${calculatedYield})`);
                 this.userData.voluntaryStakeBalance += fiveMinuteYield;
-                this.addTransaction('yield', 'Rendimento de 5 minutos stake voluntário', fiveMinuteYield);
                 this.saveUserData();
                 this.backupUserData();
+                this.updateUI();
                 if (this.currentPage === 'wallet') {
-                    this.updateWalletPage();
                     this.showToast(`+${fiveMinuteYield} DET adicionados ao stake voluntário!`, 'success');
                 }
+            } else {
+                console.log('Nenhum saldo em stake voluntário, pulando atualização');
             }
         }, 300000); // 5 minutos
     }
