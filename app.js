@@ -293,8 +293,8 @@ class DetHabitsApp {
         
         // Calculate token distribution
         const totalReward = this.currentMission.reward;
-        const stakeAmount = Math.floor(totalReward * 0.1); // 10% to stake
-        const spendingAmount = Math.floor(totalReward * 0.1); // 10% to spending
+        const stakeAmount = Math.ceil(totalReward * 0.1); // 10% to stake, using ceil to ensure deduction
+        const spendingAmount = Math.ceil(totalReward * 0.1); // 10% to spending, using ceil
         const walletAmount = totalReward - stakeAmount - spendingAmount; // Remaining to wallet
         
         // Update balances
@@ -311,7 +311,7 @@ class DetHabitsApp {
         this.updateWalletPage();
         this.saveUserData();
         
-        this.showToast(`Missão concluída! +${totalReward} DET adicionados`, 'success');
+        this.showToast(`Missão concluída! +${totalReward} DET adicionados (Stake: ${stakeAmount}, Compras: ${spendingAmount}, Wallet: ${walletAmount})`, 'success');
         
         // Check if all missions completed
         const completedToday = this.missions.filter(m => m.completed).length;
@@ -475,8 +475,10 @@ class DetHabitsApp {
     }
 
     toggleMobileMenu() {
-        // Mobile menu implementation would go here
-        this.showToast('Menu mobile em desenvolvimento', 'info');
+        const navLinks = document.querySelector('.nav-links');
+        navLinks.classList.toggle('mobile-active');
+        const menuBtn = document.getElementById('mobile-menu-btn');
+        menuBtn.classList.toggle('active');
     }
 
     showLoading(message) {
