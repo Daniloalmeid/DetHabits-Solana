@@ -6,6 +6,7 @@ class DetHabitsApp {
             totalBalance: 0,
             stakeBalance: 0,
             spendingBalance: 0,
+            voluntaryStakeBalance: 0,
             completedMissions: [],
             transactions: []
         };
@@ -24,7 +25,8 @@ class DetHabitsApp {
                 description: 'Siga nossa conta oficial no X e tire um print da tela.',
                 icon: '🐦',
                 reward: 5,
-                completed: false
+                completed: false,
+                url: 'https://x.com/seuperfil' // Altere para o link real do Twitter/X
             },
             {
                 id: 'instagram',
@@ -32,7 +34,8 @@ class DetHabitsApp {
                 description: 'Siga nosso perfil no Instagram e compartilhe uma foto.',
                 icon: '📸',
                 reward: 5,
-                completed: false
+                completed: false,
+                url: 'https://instagram.com/seuperfil' // Altere para o link real do Instagram
             },
             {
                 id: 'walk',
@@ -53,6 +56,7 @@ class DetHabitsApp {
         ];
         this.currentPage = 'home';
         this.currentMission = null;
+        this.hourlyYieldRate = 300 / 8760 / 100; // 300% ao ano dividido por 8760 horas
         
         this.init();
     }
@@ -63,6 +67,7 @@ class DetHabitsApp {
         this.updateUI();
         this.startMissionTimer();
         this.loadMissions();
+        this.startYieldUpdater();
     }
 
     setupEventListeners() {
@@ -108,6 +113,12 @@ class DetHabitsApp {
                 this.closePhotoModal();
             }
         });
+        
+        // Withdraw button
+        document.getElementById('withdraw-btn').addEventListener('click', () => this.withdrawToSolana());
+        
+        // Voluntary stake button
+        document.getElementById('stake-voluntary-btn').addEventListener('click', () => this.stakeVoluntary());
     }
 
     async connectWallet() {
@@ -220,6 +231,11 @@ class DetHabitsApp {
         const card = document.createElement('div');
         card.className = `mission-card ${mission.completed ? 'completed' : ''}`;
         
+        let linkHtml = '';
+        if (mission.url) {
+            linkHtml = `<a href="${mission.url}" target="_blank" class="mission-link">Abrir Perfil</a>`;
+        }
+        
         card.innerHTML = `
             <div class="mission-header">
                 <div class="mission-icon">${mission.icon}</div>
@@ -227,6 +243,7 @@ class DetHabitsApp {
             </div>
             <div class="mission-title">${mission.title}</div>
             <div class="mission-description">${mission.description}</div>
+            ${linkHtml}
             <button class="mission-button ${mission.completed ? 'completed' : 'pending'}" 
                     ${mission.completed ? 'disabled' : ''} 
                     onclick="app.openPhotoModal('${mission.id}')">
@@ -339,7 +356,16 @@ class DetHabitsApp {
         document.getElementById('total-balance').textContent = this.userData.totalBalance;
         document.getElementById('stake-balance').textContent = this.userData.stakeBalance;
         document.getElementById('spending-balance').textContent = this.userData.spendingBalance;
+        document.getElementById('voluntary-stake-balance').textContent = this.userData.voluntaryStakeBalance;
         document.getElementById('daily-yield').textContent = `+${Math.floor(this.userData.stakeBalance * 0.008)}`;
+        
+        // Mostrar botão de withdraw se saldo >= 800
+        const withdrawBtn = document.getElementById('withdraw-btn');
+        if (this.userData.totalBalance >= 800) {
+            withdrawBtn.style.display = 'block';
+        } else {
+            withdrawBtn.style.display = 'none';
+        }
         
         this.loadTransactionHistory();
     }
@@ -534,6 +560,7 @@ class DetHabitsApp {
                 totalBalance: 0,
                 stakeBalance: 0,
                 spendingBalance: 0,
+                voluntaryStakeBalance: 0,
                 completedMissions: [],
                 transactions: []
             };
@@ -559,6 +586,87 @@ class DetHabitsApp {
         this.updateWalletPage();
         this.updateShopPage();
         this.updateMissionsPage();
+    }
+
+    startYieldUpdater() {
+        setInterval(() => {
+            if (this.userData.stakeBalance > 0) {
+                const hourlyYield = Math.floor(this.userData.stakeBalance * this.hourlyYieldRate);
+                this.userData.stakeBalance += hourlyYield;
+                this.addTransaction('yield', 'Rendimento horário stake obrigatório', hourlyYield);
+                this.saveUserData();
+                if (this.currentPage === 'wallet') {
+                    this.updateWalletPage();
+                }
+            }
+            if (this.userData.voluntaryStakeBalance > 0) {
+                const hourlyYield = Math.floor(this.userData.voluntaryStakeBalance * this.hourlyYieldRate);
+                this.userData.voluntaryStakeBalance += hourlyYield;
+                this.addTransaction('yield', 'Rendimento horário stake voluntário', hourlyYield);
+                this.saveUserData();
+                if (this.currentPage === 'wallet') {
+                    this.updateWalletPage();
+                }
+            }
+        }, 3600000); // 1 hora = 3600000 ms
+    }
+
+    stakeVoluntary() {
+        const amountInput = document.getElementById('stake-amount-input');
+        const amount = parseInt(amountInput.value);
+        if (isNaN(amount) || amount <= 0 || amount > this.userData.totalBalance) {
+            this.showToast('Quantidade inválida ou saldo insuficiente.', 'error');
+            return;
+        }
+        
+        this.userData.totalBalance -= amount;
+        this.userData.voluntaryStakeBalance += amount;
+        this.addTransaction('stake', `Stake voluntário de ${amount} DET`, -amount);
+        this.saveUserData();
+        this.updateWalletPage();
+        amountInput.value = '';
+        this.showToast(`Stake voluntário de ${amount} DET realizado com sucesso!`, 'success');
+    }
+
+    async withdrawToSolana() {
+        if (this.userData.totalBalance < 800) {
+            this.showToast('Saldo mínimo para retirada é 800 DET.', 'error');
+            return;
+        }
+        
+        try {
+            // Exemplo de integração com Solana para transferência (ajuste com seu token mint e ATA)
+            const connection = new solanaWeb3.Connection(solanaWeb3.clusterApiUrl('devnet'));
+            const fromPubkey = new solanaWeb3.PublicKey(this.wallet);
+            const toPubkey = new solanaWeb3.PublicKey('ENDERECO_DESTINO_AQUI'); // Ajuste para o endereço de destino
+            const tokenMint = new solanaWeb3.PublicKey('TOKEN_MINT_DET_AQUI'); // Mint do token DET
+            
+            // Obter ATAs
+            const fromATA = await splToken.getAssociatedTokenAddress(tokenMint, fromPubkey);
+            const toATA = await splToken.getAssociatedTokenAddress(tokenMint, toPubkey);
+            
+            // Criar transação
+            const transaction = new solanaWeb3.Transaction().add(
+                splToken.createTransferInstruction(
+                    fromATA,
+                    toATA,
+                    fromPubkey,
+                    this.userData.totalBalance * 1e9 // Assumindo 9 decimais
+                )
+            );
+            
+            const signature = await window.solana.signAndSendTransaction(transaction);
+            await connection.confirmTransaction(signature);
+            
+            this.userData.totalBalance = 0;
+            this.addTransaction('withdraw', 'Retirada para carteira Solana', -this.userData.totalBalance);
+            this.saveUserData();
+            this.updateWalletPage();
+            this.showToast('Retirada realizada com sucesso!', 'success');
+        } catch (error) {
+            console.error('Erro na retirada:', error);
+            this.showToast('Erro ao realizar a retirada. Tente novamente.', 'error');
+        }
     }
 }
 

@@ -111,6 +111,7 @@
                         <div class="det-icon">🎯</div>
                     </div>
                     <div class="balance-amount" id="total-balance">0</div>
+                    <button id="withdraw-btn" class="btn-primary full-width" style="display: none;">Enviar para Carteira Solana</button>
                 </div>
 
                 <div class="wallet-card stake-balance">
@@ -128,6 +129,18 @@
                             <span>Rendimento diário:</span>
                             <span id="daily-yield">+0</span>
                         </div>
+                    </div>
+                </div>
+
+                <div class="wallet-card stake-voluntary">
+                    <div class="card-header">
+                        <h3>Stake Voluntário</h3>
+                        <div class="stake-info">300% ao ano</div>
+                    </div>
+                    <div class="balance-amount" id="voluntary-stake-balance">0</div>
+                    <div class="stake-input">
+                        <input type="number" id="stake-amount-input" placeholder="Quantidade DET para stake" min="1">
+                        <button id="stake-voluntary-btn" class="btn-primary">Stake</button>
                     </div>
                 </div>
 
@@ -359,7 +372,7 @@
             <div class="modal-body">
                 <p>Envie uma foto comprovando que você completou esta missão:</p>
                 <div class="photo-upload-area">
-                    <input type="file" id="photo-input" accept="image/*" capture="environment">
+                    <input type="file" id="photo-input" accept="image/*">
                     <label for="photo-input" class="photo-upload-label">
                         <div class="upload-icon">📷</div>
                         <div>Tirar Foto ou Selecionar da Galeria</div>
