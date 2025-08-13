@@ -64,14 +64,6 @@ class DetHabitsApp {
         this.startMissionTimer();
         this.loadMissions();
         this.checkMobileConnection();
-        this.showMobileInstructions();
-    }
-    
-    showMobileInstructions() {
-        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-        if (isMobile && !this.wallet) {
-            document.getElementById('mobile-instructions').style.display = 'block';
-        }
     }
     
     checkMobileConnection() {
@@ -182,7 +174,43 @@ class DetHabitsApp {
             document.getElementById('connect-btn-text').textContent = 'Abrindo Phantom...';
         }
         
+        // Update button text for mobile
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        if (isMobile) {
+            document.getElementById('connect-btn-text').textContent = 'Abrindo Phantom...';
+        }
+        
         try {
+            // Check if we're on mobile
+            
+            if (isMobile) {
+                // Mobile: redirect to Phantom app
+                this.hideLoading();
+                
+                // Create deep link to open current URL in Phantom browser
+                const currentUrl = window.location.href;
+                const phantomUrl = `https://phantom.app/ul/browse/${encodeURIComponent(currentUrl)}?ref=https%3A%2F%2Fphantom.app`;
+                
+                // Try to open Phantom app
+                window.location.href = phantomUrl;
+                
+                // Fallback: show instructions if app doesn't open
+                setTimeout(() => {
+                    this.showToast('Abrindo no navegador Phantom...', 'info');
+                    
+                    // If still on the page after 3 seconds, show install instructions
+                    setTimeout(() => {
+                        if (document.hasFocus()) {
+                            this.showToast('Certifique-se de ter o app Phantom instalado', 'error');
+                            document.getElementById('connect-btn-text').textContent = 'Conectar Carteira Phantom';
+                        }
+                    }, 3000);
+                }, 500);
+                
+                return;
+            }
+            
+            // Desktop: use extension
             // Check if we're on mobile
             
             if (isMobile) {
