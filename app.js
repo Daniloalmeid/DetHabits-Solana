@@ -63,11 +63,6 @@ class DetHabitsApp {
         this.updateUI();
         this.startMissionTimer();
         this.loadMissions();
-        this.checkMobileConnection();
-    }
-    
-    checkMobileConnection() {
-        // Mobile connection check will be handled in connectWallet method
     }
 
     setupEventListeners() {
@@ -117,53 +112,47 @@ class DetHabitsApp {
 
     async connectWallet() {
         this.showLoading('Conectando carteira...');
-        
+
         try {
-            // Check if we're on mobile
-            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-            
-            if (isMobile) {
-                // Mobile: redirect to Phantom browser
-                this.hideLoading();
-                
-                // Create the Phantom browser URL
-                const currentUrl = window.location.href;
-                const phantomUrl = `https://phantom.app/ul/browse/${encodeURIComponent(currentUrl)}?ref=https%3A%2F%2Fphantom.app`;
-                
-                // Open in Phantom browser
-                window.location.href = phantomUrl;
-                return;
-            }
-            
-            // Desktop: check for Phantom extension
-            if (!window.solana || !window.solana.isPhantom) {
-                this.hideLoading();
-                this.showToast('Phantom wallet não encontrada. Instale a extensão Phantom.', 'error');
-                return;
+            // Verifica se o Phantom está disponível (desktop)
+            if (window.solana && window.solana.isPhantom) {
+                const response = await window.solana.connect();
+                this.wallet = response.publicKey.toString();
+            } else {
+                // Lógica para mobile: tenta abrir o app Phantom via deep link otimizado
+                const redirectUrl = encodeURIComponent('https://daniloalmeid.github.io/DetHabits-Solana/');
+                const deepLink = `phantom://connect?redirect=${redirectUrl}&dapp_name=DetHabits&dapp_url=${encodeURIComponent('https://daniloalmeid.github.io/DetHabits-Solana/')}&action=connect&cluster=mainnet-beta`;
+                console.log('Tentativa de deep link:', deepLink);
+                const startTime = Date.now();
+                window.location.href = deepLink;
+                console.log('Deep link disparado. Tempo inicial:', startTime);
+
+                // Aguarda retorno (20 segundos)
+                await new Promise((resolve) => setTimeout(resolve, 20000));
+                const endTime = Date.now();
+                console.log('Tempo decorrido:', (endTime - startTime) / 1000, 'segundos');
+
+                if (!this.wallet) {
+                    this.hideLoading();
+                    console.log('Falha na conexão automática. Verifique se o Phantom abriu.');
+                    this.showToast('A conexão automática falhou. Verifique se o Phantom abriu e aceite a conexão. Se não abriu, tente novamente ou use https://daniloalmeid.github.io/DetHabits-Solana/ no navegador interno do Phantom.', 'info');
+                }
             }
 
-            // Connect to Phantom
-            const response = await window.solana.connect();
-            this.wallet = response.publicKey.toString();
-            
-            // Show success message
-            this.showToast('Carteira conectada com sucesso!', 'success');
-            
-            // Navigate to missions page
-            this.navigateTo('missions');
-            
-            // Load user data for this wallet
-            this.loadUserData();
-            
-            // Update UI
-            this.updateWalletDisplay();
-            this.updateUI();
+            // Se conectado com sucesso
+            if (this.wallet) {
+                this.showToast('Carteira conectada com sucesso!', 'success');
+                this.navigateTo('missions');
+                this.loadUserData();
+                this.updateWalletDisplay();
+                this.updateUI();
+            }
             this.hideLoading();
-            
+
         } catch (error) {
             this.hideLoading();
-            console.error('Wallet connection error:', error);
-            this.showToast('Erro ao conectar carteira. Tente novamente.', 'error');
+            console.error('Erro de conexão com a carteira:', error.message || error);
+            this.showToast('Erro ao conectar carteira. Reinicie o app Phantom, atualize-o, ou use https://daniloalmeid.github.io/DetHabits-Solana/ no navegador interno.', 'error');
         }
     }
 
