@@ -35,36 +35,50 @@
 
     <!-- Home Page -->
     <div id="home-page" class="page active">
-        <div class="hero-container">
-            <div class="hero-content">
-                <div class="logo-container">
-                    <img src="logo.png" alt="DetHabits Logo" class="logo-image">
-                    <h1 class="hero-title">DetHabits</h1>
-                </div>
-                <p class="hero-subtitle">Transforme seus hábitos diários em tokens DET</p>
-                <p class="hero-description">Complete missões, ganhe recompensas e construa uma vida mais saudável na blockchain Solana.</p>
-                
-                <!-- Novo texto e botão para celular -->
-                <div class="mobile-instruction">
-                    <p>⚠️ Se você está no celular, a conexão automática pode falhar. Copie a URL abaixo e cole no navegador interno do app Phantom:</p>
-                    <p id="app-url">https://daniloalmeid.github.io/DetHabits-Solana/</p>
-                    <button id="copy-url-btn">Copiar URL</button>
-                </div>
-
-                <div class="hero-buttons">
-                    <button id="connect-wallet-btn" class="btn-primary">
-                        <span>🦄</span>
-                        Conectar Carteira Phantom
-                    </button>
-                    <button id="presale-btn" class="btn-secondary">
-                        <span>🚀</span>
-                        Pré-venda
-                    </button>
+        <div class="hero-background">
+            <div class="container">
+                <div class="hero-card">
+                    <div class="hero-header">
+                        <img src="logo.png" alt="DetHabits Logo" class="hero-logo">
+                        <h1 class="hero-title">DetHabits</h1>
+                    </div>
+                    <div class="hero-content">
+                        <h2 class="hero-subtitle">Revolucione Seus Hábitos</h2>
+                        <p class="hero-description">Ganhe tokens DET ao completar missões diárias e transforme sua rotina em recompensas na blockchain Solana.</p>
+                        <div class="hero-stats">
+                            <div class="stat-item">
+                                <span class="stat-number">300%</span>
+                                <span class="stat-label">Rendimento Anual</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-number">5+</span>
+                                <span class="stat-label">Missões Diárias</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-number">Solana</span>
+                                <span class="stat-label">Blockchain</span>
+                            </div>
+                        </div>
+                        <div class="mobile-instruction">
+                            <p>⚠️ No celular, copie esta URL e cole no navegador interno do app Phantom:</p>
+                            <p id="app-url">https://daniloalmeid.github.io/DetHabits-Solana/</p>
+                            <button id="copy-url-btn" class="btn-secondary">Copiar URL</button>
+                        </div>
+                        <div class="hero-buttons">
+                            <button id="connect-wallet-btn" class="btn-primary">
+                                <span>🦄</span>
+                                Conectar Carteira Phantom
+                            </button>
+                            <button id="presale-btn" class="btn-secondary">
+                                <span>🚀</span>
+                                Pré-venda
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
+            <div class="background-particles"></div>
         </div>
-        <!-- Partículas de fundo (decoração) -->
-        <div class="background-particles"></div>
     </div>
 
     <!-- Missions Page -->
@@ -77,11 +91,9 @@
                     <span id="mission-timer">23:45:12</span>
                 </div>
             </div>
-
             <div class="missions-grid" id="missions-grid">
                 <!-- Missions will be populated by JavaScript -->
             </div>
-
             <div class="daily-summary">
                 <div class="summary-card">
                     <div class="summary-title">Progresso Diário</div>
@@ -103,7 +115,6 @@
                 <h1>Minha Carteira</h1>
                 <div class="wallet-address-display" id="wallet-address-full"></div>
             </div>
-
             <div class="wallet-cards">
                 <div class="wallet-card main-balance">
                     <div class="card-header">
@@ -113,7 +124,6 @@
                     <div class="balance-amount" id="total-balance">0</div>
                     <button id="withdraw-btn" class="btn-primary full-width" style="display: none;">Enviar para Carteira Solana</button>
                 </div>
-
                 <div class="wallet-card stake-balance">
                     <div class="card-header">
                         <h3>Stake Obrigatório</h3>
@@ -131,7 +141,6 @@
                         </div>
                     </div>
                 </div>
-
                 <div class="wallet-card stake-voluntary">
                     <div class="card-header">
                         <h3>Stake Voluntário</h3>
@@ -141,9 +150,9 @@
                     <div class="stake-input">
                         <input type="number" id="stake-amount-input" placeholder="Quantidade DET para stake" min="1">
                         <button id="stake-voluntary-btn" class="btn-primary">Stake</button>
+                        <button id="unstake-voluntary-btn" class="btn-secondary">Retirar Stake</button>
                     </div>
                 </div>
-
                 <div class="wallet-card spending-balance">
                     <div class="card-header">
                         <h3>Saldo para Compras</h3>
@@ -152,7 +161,6 @@
                     <div class="balance-amount" id="spending-balance">0</div>
                 </div>
             </div>
-
             <div class="transaction-history">
                 <h3>Histórico de Transações</h3>
                 <div class="history-list" id="transaction-history">
@@ -172,14 +180,12 @@
                     <span id="shop-balance">0 DET</span>
                 </div>
             </div>
-
             <div class="shop-categories">
                 <button class="category-btn active" data-category="all">Todos</button>
                 <button class="category-btn" data-category="accessories">Acessórios</button>
                 <button class="category-btn" data-category="supplements">Suplementos</button>
                 <button class="category-btn" data-category="gear">Equipamentos</button>
             </div>
-
             <div class="shop-grid">
                 <div class="shop-item" data-category="accessories">
                     <div class="item-image">💧</div>
@@ -190,7 +196,6 @@
                     </div>
                     <button class="buy-btn">Comprar</button>
                 </div>
-
                 <div class="shop-item" data-category="supplements">
                     <div class="item-image">💊</div>
                     <div class="item-info">
@@ -200,7 +205,6 @@
                     </div>
                     <button class="buy-btn">Comprar</button>
                 </div>
-
                 <div class="shop-item" data-category="gear">
                     <div class="item-image">🎯</div>
                     <div class="item-info">
@@ -223,13 +227,11 @@
                     <span>Versão 1.0 - Janeiro 2025</span>
                 </div>
             </div>
-
             <div class="whitepaper-content">
                 <section class="wp-section">
                     <h2>Introdução</h2>
                     <p>DetHabits é uma plataforma inovadora que combina desenvolvimento pessoal com tecnologia blockchain, incentivando hábitos saudáveis através de recompensas em tokens DET.</p>
                 </section>
-
                 <section class="wp-section">
                     <h2>Tokenomics</h2>
                     <div class="tokenomics-chart">
@@ -253,12 +255,10 @@
                         </div>
                     </div>
                 </section>
-
                 <section class="wp-section">
                     <h2>Sistema de Staking</h2>
                     <p>10% de todos os tokens ganhos são automaticamente direcionados para um pool de staking obrigatório com rendimento de 300% ao ano, bloqueados por 3 meses para garantir sustentabilidade do ecossistema.</p>
                 </section>
-
                 <section class="wp-section">
                     <h2>Roadmap</h2>
                     <div class="roadmap">
@@ -298,13 +298,11 @@
                     <span class="status-badge active">Ativo</span>
                 </div>
             </div>
-
             <div class="presale-hero">
                 <div class="presale-info">
                     <h2>Participe da revolução dos hábitos saudáveis</h2>
                     <p>Adquira tokens DET com desconto exclusivo na pré-venda e seja um dos primeiros a fazer parte do ecossistema DetHabits.</p>
                 </div>
-
                 <div class="presale-stats">
                     <div class="stat-card">
                         <div class="stat-number">50%</div>
@@ -320,7 +318,6 @@
                     </div>
                 </div>
             </div>
-
             <div class="presale-calculator">
                 <h3>Calculadora de Compra</h3>
                 <div class="calculator-form">
@@ -338,7 +335,6 @@
                     </button>
                 </div>
             </div>
-
             <div class="presale-features">
                 <h3>Vantagens da Pré-venda</h3>
                 <div class="features-grid">

@@ -26,7 +26,7 @@ class DetHabitsApp {
                 icon: '🐦',
                 reward: 5,
                 completed: false,
-                url: 'https://x.com/seuperfil' // Altere para o link real do Twitter/X
+                url: 'https://x.com/seuperfil'
             },
             {
                 id: 'instagram',
@@ -35,7 +35,7 @@ class DetHabitsApp {
                 icon: '📸',
                 reward: 5,
                 completed: false,
-                url: 'https://instagram.com/seuperfil' // Altere para o link real do Instagram
+                url: 'https://instagram.com/seuperfil'
             },
             {
                 id: 'walk',
@@ -71,115 +71,73 @@ class DetHabitsApp {
     }
 
     setupEventListeners() {
-        // Connect wallet
         document.getElementById('connect-wallet-btn').addEventListener('click', () => this.connectWallet());
-        
-        // Navigation
         document.querySelectorAll('.nav-button').forEach(btn => {
             btn.addEventListener('click', (e) => this.navigateTo(e.target.dataset.page));
         });
-        
-        // Disconnect wallet
         document.getElementById('disconnect-btn').addEventListener('click', () => this.disconnectWallet());
-        
-        // Presale button
         document.getElementById('presale-btn').addEventListener('click', () => this.navigateTo('presale'));
-        
-        // Photo modal
         document.getElementById('close-modal').addEventListener('click', () => this.closePhotoModal());
         document.getElementById('photo-input').addEventListener('change', (e) => this.handlePhotoSelect(e));
         document.getElementById('submit-mission-btn').addEventListener('click', () => this.completeMission());
-        
-        // Presale calculator
         document.getElementById('sol-amount').addEventListener('input', (e) => this.updatePresaleCalculation(e));
         document.getElementById('buy-presale-btn').addEventListener('click', () => this.buyPresale());
-        
-        // Shop categories
         document.querySelectorAll('.category-btn').forEach(btn => {
             btn.addEventListener('click', (e) => this.filterShopItems(e.target.dataset.category));
         });
-        
-        // Buy buttons
         document.querySelectorAll('.buy-btn').forEach(btn => {
             btn.addEventListener('click', (e) => this.buyItem(e));
         });
-        
-        // Mobile menu
         document.getElementById('mobile-menu-btn').addEventListener('click', () => this.toggleMobileMenu());
-        
-        // Click outside modal to close
         document.getElementById('photo-modal').addEventListener('click', (e) => {
             if (e.target === e.currentTarget) {
                 this.closePhotoModal();
             }
         });
-        
-        // Withdraw button
         document.getElementById('withdraw-btn').addEventListener('click', () => this.withdrawToSolana());
-        
-        // Voluntary stake button
         document.getElementById('stake-voluntary-btn').addEventListener('click', () => this.stakeVoluntary());
+        document.getElementById('unstake-voluntary-btn').addEventListener('click', () => this.unstakeVoluntary());
     }
 
     async connectWallet() {
         this.showLoading('Conectando carteira...');
-
         try {
-            // Verifica se o Phantom está disponível (desktop)
             if (window.solana && window.solana.isPhantom) {
                 const response = await window.solana.connect();
                 this.wallet = response.publicKey.toString();
             } else {
-                // Lógica para mobile: tenta abrir o app Phantom via deep link
                 const redirectUrl = encodeURIComponent('https://daniloalmeid.github.io/DetHabits-Solana/');
                 const deepLink = `phantom://connect?redirect=${redirectUrl}&dapp_name=DetHabits&dapp_url=${encodeURIComponent('https://daniloalmeid.github.io/DetHabits-Solana/')}&action=connect`;
-                console.log('Abrindo deep link:', deepLink);
                 window.location.href = deepLink;
-                console.log('Deep link disparado');
-
-                // Aguarda retorno (15 segundos) e verifica conexão
                 await new Promise((resolve) => setTimeout(resolve, 15000));
-
                 if (!this.wallet) {
                     this.hideLoading();
-                    this.showToast('A conexão automática falhou. Por favor, abra https://daniloalmeid.github.io/DetHabits-Solana/ diretamente no navegador interno do app Phantom e confirme a conexão lá.', 'info');
-                    return; // Sai da função se a conexão falhar
+                    this.showToast('A conexão automática falhou. Abra https://daniloalmeid.github.io/DetHabits-Solana/ no navegador interno do Phantom.', 'info');
+                    return;
                 }
             }
-
-            // Se conectado com sucesso
             if (this.wallet) {
                 this.showToast('Carteira conectada com sucesso!', 'success');
-                // Esconde a página inicial permanentemente enquanto conectado
                 document.getElementById('home-page').style.display = 'none';
-                // Mostra a página de missões
                 this.navigateTo('missions');
                 this.loadUserData();
                 this.updateWalletDisplay();
                 this.updateUI();
             }
             this.hideLoading();
-
         } catch (error) {
             this.hideLoading();
             console.error('Wallet connection error:', error);
-            this.showToast('Erro ao conectar carteira. Tente novamente ou abra https://daniloalmeid.github.io/DetHabits-Solana/ no navegador interno do Phantom.', 'error');
+            this.showToast('Erro ao conectar carteira. Tente novamente ou abra no Phantom.', 'error');
         }
     }
 
     disconnectWallet() {
-        // Save current data before disconnecting
         this.saveUserData();
-        
-        // Clear current session
         this.wallet = null;
-        
-        // Restaura a página inicial
-        document.getElementById('home-page').style.display = 'flex';
-        // Esconde a navbar e vai para a página inicial
+        document.getElementById('home-page').style.display = 'block';
         document.getElementById('navbar').style.display = 'none';
         this.navigateTo('home');
-        
         this.showToast('Carteira desconectada', 'success');
     }
 
@@ -193,49 +151,30 @@ class DetHabitsApp {
     }
 
     navigateTo(page) {
-        // Hide all pages
         document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-        
-        // Show target page
         document.getElementById(`${page}-page`).classList.add('active');
-        
-        // Update navigation
         document.querySelectorAll('.nav-button').forEach(btn => btn.classList.remove('active'));
         document.querySelector(`[data-page="${page}"]`)?.classList.add('active');
-        
         this.currentPage = page;
-        
-        // Update page-specific content
-        if (page === 'wallet') {
-            this.updateWalletPage();
-        } else if (page === 'missions') {
-            this.updateMissionsPage();
-        } else if (page === 'shop') {
-            this.updateShopPage();
-        }
+        if (page === 'wallet') this.updateWalletPage();
+        else if (page === 'missions') this.updateMissionsPage();
+        else if (page === 'shop') this.updateShopPage();
     }
 
     loadMissions() {
         const missionsGrid = document.getElementById('missions-grid');
         missionsGrid.innerHTML = '';
-        
         this.missions.forEach(mission => {
             const missionCard = this.createMissionCard(mission);
             missionsGrid.appendChild(missionCard);
         });
-        
         this.updateMissionProgress();
     }
 
     createMissionCard(mission) {
         const card = document.createElement('div');
         card.className = `mission-card ${mission.completed ? 'completed' : ''}`;
-        
-        let linkHtml = '';
-        if (mission.url) {
-            linkHtml = `<a href="${mission.url}" target="_blank" class="mission-link">Abrir Perfil</a>`;
-        }
-        
+        let linkHtml = mission.url ? `<a href="${mission.url}" target="_blank" class="mission-link">Abrir Perfil</a>` : '';
         card.innerHTML = `
             <div class="mission-header">
                 <div class="mission-icon">${mission.icon}</div>
@@ -250,14 +189,12 @@ class DetHabitsApp {
                 ${mission.completed ? '✅ Concluída' : '📷 Completar Missão'}
             </button>
         `;
-        
         return card;
     }
 
     openPhotoModal(missionId) {
         this.currentMission = this.missions.find(m => m.id === missionId);
         if (!this.currentMission || this.currentMission.completed) return;
-        
         document.getElementById('modal-mission-title').textContent = this.currentMission.title;
         document.getElementById('photo-modal').classList.add('active');
         document.getElementById('submit-mission-btn').disabled = true;
@@ -274,20 +211,14 @@ class DetHabitsApp {
     handlePhotoSelect(event) {
         const file = event.target.files[0];
         if (!file) return;
-        
-        // Validate file type
         if (!file.type.startsWith('image/')) {
             this.showToast('Por favor, selecione uma imagem válida.', 'error');
             return;
         }
-        
-        // Validate file size (max 5MB)
         if (file.size > 5 * 1024 * 1024) {
             this.showToast('A imagem deve ter no máximo 5MB.', 'error');
             return;
         }
-        
-        // Show preview
         const reader = new FileReader();
         reader.onload = (e) => {
             document.getElementById('photo-preview').innerHTML = 
@@ -299,38 +230,25 @@ class DetHabitsApp {
 
     completeMission() {
         if (!this.currentMission) return;
-        
-        // Mark mission as completed
         this.currentMission.completed = true;
         this.userData.completedMissions.push({
             id: this.currentMission.id,
             completedAt: new Date().toISOString(),
             reward: this.currentMission.reward
         });
-        
-        // Calculate token distribution
         const totalReward = this.currentMission.reward;
-        const stakeAmount = Math.ceil(totalReward * 0.1); // 10% to stake, using ceil to ensure deduction
-        const spendingAmount = Math.ceil(totalReward * 0.1); // 10% to spending, using ceil
-        const walletAmount = totalReward - stakeAmount - spendingAmount; // Remaining to wallet
-        
-        // Update balances
+        const stakeAmount = Math.ceil(totalReward * 0.1);
+        const spendingAmount = Math.ceil(totalReward * 0.1);
+        const walletAmount = totalReward - stakeAmount - spendingAmount;
         this.userData.totalBalance += walletAmount;
         this.userData.stakeBalance += stakeAmount;
         this.userData.spendingBalance += spendingAmount;
-        
-        // Add transaction
         this.addTransaction('mission', `Missão: ${this.currentMission.title}`, totalReward);
-        
-        // Update UI
         this.closePhotoModal();
         this.loadMissions();
         this.updateWalletPage();
         this.saveUserData();
-        
         this.showToast(`Missão concluída! +${totalReward} DET adicionados (Stake: ${stakeAmount}, Compras: ${spendingAmount}, Wallet: ${walletAmount})`, 'success');
-        
-        // Check if all missions completed
         const completedToday = this.missions.filter(m => m.completed).length;
         if (completedToday === this.missions.length) {
             setTimeout(() => {
@@ -342,7 +260,6 @@ class DetHabitsApp {
     updateMissionProgress() {
         const completedCount = this.missions.filter(m => m.completed).length;
         const progressPercentage = (completedCount / this.missions.length) * 100;
-        
         document.getElementById('daily-progress').style.width = `${progressPercentage}%`;
         document.getElementById('completed-missions').textContent = completedCount;
     }
@@ -358,15 +275,12 @@ class DetHabitsApp {
         document.getElementById('spending-balance').textContent = this.userData.spendingBalance;
         document.getElementById('voluntary-stake-balance').textContent = this.userData.voluntaryStakeBalance;
         document.getElementById('daily-yield').textContent = `+${Math.floor(this.userData.stakeBalance * 0.008)}`;
-        
-        // Mostrar botão de withdraw se saldo >= 800
         const withdrawBtn = document.getElementById('withdraw-btn');
         if (this.userData.totalBalance >= 800) {
             withdrawBtn.style.display = 'block';
         } else {
             withdrawBtn.style.display = 'none';
         }
-        
         this.loadTransactionHistory();
     }
 
@@ -382,8 +296,6 @@ class DetHabitsApp {
             amount,
             timestamp: new Date().toISOString()
         });
-        
-        // Keep only last 50 transactions
         if (this.userData.transactions.length > 50) {
             this.userData.transactions = this.userData.transactions.slice(0, 50);
         }
@@ -392,35 +304,32 @@ class DetHabitsApp {
     loadTransactionHistory() {
         const historyContainer = document.getElementById('transaction-history');
         historyContainer.innerHTML = '';
-        
         if (this.userData.transactions.length === 0) {
             historyContainer.innerHTML = '<p style="text-align: center; color: var(--gray-500); padding: 2rem;">Nenhuma transação encontrada</p>';
             return;
         }
-        
         this.userData.transactions.forEach(transaction => {
             const item = document.createElement('div');
             item.className = 'transaction-item';
-            
             const date = new Date(transaction.timestamp).toLocaleDateString('pt-BR');
             const time = new Date(transaction.timestamp).toLocaleTimeString('pt-BR', { 
                 hour: '2-digit', 
                 minute: '2-digit' 
             });
-            
             item.innerHTML = `
                 <div class="transaction-info">
                     <div class="transaction-icon ${transaction.type}">
-                        ${transaction.type === 'mission' ? '🎯' : transaction.type === 'stake' ? '🏦' : '🛍️'}
+                        ${transaction.type === 'mission' ? '🎯' : transaction.type === 'stake' || transaction.type === 'unstake' ? '🏦' : transaction.type === 'yield' ? '💸' : transaction.type === 'withdraw' ? '↗️' : '🛍️'}
                     </div>
                     <div class="transaction-details">
                         <h4>${transaction.description}</h4>
                         <p>${date} às ${time}</p>
                     </div>
                 </div>
-                <div class="transaction-amount positive">+${transaction.amount} DET</div>
+                <div class="transaction-amount ${transaction.amount >= 0 ? 'positive' : 'negative'}">
+                    ${transaction.amount >= 0 ? '+' : ''}${transaction.amount} DET
+                </div>
             `;
-            
             historyContainer.appendChild(item);
         });
     }
@@ -431,24 +340,20 @@ class DetHabitsApp {
             const tomorrow = new Date();
             tomorrow.setDate(tomorrow.getDate() + 1);
             tomorrow.setHours(0, 0, 0, 0);
-            
             const diff = tomorrow - now;
-            
             const hours = Math.floor(diff / (1000 * 60 * 60));
             const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
             const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-            
             document.getElementById('mission-timer').textContent = 
                 `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
         };
-        
         updateTimer();
         setInterval(updateTimer, 1000);
     }
 
     updatePresaleCalculation(event) {
         const solAmount = parseFloat(event.target.value) || 0;
-        const detAmount = solAmount * 10000; // Example rate: 1 SOL = 10,000 DET
+        const detAmount = solAmount * 10000;
         document.getElementById('det-amount').value = detAmount.toLocaleString('pt-BR');
     }
 
@@ -458,16 +363,12 @@ class DetHabitsApp {
             this.showToast('Por favor, insira um valor válido em SOL.', 'error');
             return;
         }
-        
         this.showToast('Funcionalidade de compra será implementada em breve!', 'info');
     }
 
     filterShopItems(category) {
-        // Update active category button
         document.querySelectorAll('.category-btn').forEach(btn => btn.classList.remove('active'));
         document.querySelector(`[data-category="${category}"]`).classList.add('active');
-        
-        // Filter items
         document.querySelectorAll('.shop-item').forEach(item => {
             if (category === 'all' || item.dataset.category === category) {
                 item.style.display = 'block';
@@ -481,22 +382,14 @@ class DetHabitsApp {
         const itemCard = event.target.closest('.shop-item');
         const itemName = itemCard.querySelector('h4').textContent;
         const itemPrice = parseInt(itemCard.querySelector('.item-price').textContent);
-        
         if (this.userData.spendingBalance < itemPrice) {
             this.showToast('Saldo insuficiente para esta compra.', 'error');
             return;
         }
-        
-        // Deduct from spending balance
         this.userData.spendingBalance -= itemPrice;
-        
-        // Add transaction
         this.addTransaction('purchase', `Compra: ${itemName}`, -itemPrice);
-        
-        // Update UI
         this.updateShopPage();
         this.saveUserData();
-        
         this.showToast(`${itemName} comprado com sucesso!`, 'success');
     }
 
@@ -521,9 +414,7 @@ class DetHabitsApp {
         const toast = document.createElement('div');
         toast.className = `toast ${type}`;
         toast.textContent = message;
-        
         document.getElementById('toast-container').appendChild(toast);
-        
         setTimeout(() => {
             toast.remove();
         }, 5000);
@@ -531,20 +422,15 @@ class DetHabitsApp {
 
     loadUserData() {
         if (!this.wallet) return;
-        
-        // Load data specific to this wallet address
         const saved = localStorage.getItem(`dethabits_data_${this.wallet}`);
         if (saved) {
             try {
                 const data = JSON.parse(saved);
                 this.userData = { ...this.userData, ...data };
-                
-                // Restore mission completion status
                 if (data.completedMissions) {
                     data.completedMissions.forEach(completed => {
                         const mission = this.missions.find(m => m.id === completed.id);
                         if (mission) {
-                            // Check if mission was completed today
                             const completedDate = new Date(completed.completedAt).toDateString();
                             const today = new Date().toDateString();
                             mission.completed = completedDate === today;
@@ -555,7 +441,6 @@ class DetHabitsApp {
                 console.error('Error loading user data:', error);
             }
         } else {
-            // Initialize fresh data for new wallet
             this.userData = {
                 totalBalance: 0,
                 stakeBalance: 0,
@@ -570,9 +455,7 @@ class DetHabitsApp {
 
     saveUserData() {
         if (!this.wallet) return;
-        
         try {
-            // Save data with wallet address as key
             localStorage.setItem(`dethabits_data_${this.wallet}`, JSON.stringify(this.userData));
         } catch (error) {
             console.error('Error saving user data:', error);
@@ -608,7 +491,7 @@ class DetHabitsApp {
                     this.updateWalletPage();
                 }
             }
-        }, 3600000); // 1 hora = 3600000 ms
+        }, 3600000);
     }
 
     stakeVoluntary() {
@@ -618,7 +501,6 @@ class DetHabitsApp {
             this.showToast('Quantidade inválida ou saldo insuficiente.', 'error');
             return;
         }
-        
         this.userData.totalBalance -= amount;
         this.userData.voluntaryStakeBalance += amount;
         this.addTransaction('stake', `Stake voluntário de ${amount} DET`, -amount);
@@ -628,24 +510,32 @@ class DetHabitsApp {
         this.showToast(`Stake voluntário de ${amount} DET realizado com sucesso!`, 'success');
     }
 
+    unstakeVoluntary() {
+        if (this.userData.voluntaryStakeBalance <= 0) {
+            this.showToast('Nenhum valor em stake voluntário para retirar.', 'error');
+            return;
+        }
+        const amount = this.userData.voluntaryStakeBalance;
+        this.userData.voluntaryStakeBalance = 0;
+        this.userData.totalBalance += amount;
+        this.addTransaction('unstake', `Retirada de stake voluntário de ${amount} DET`, amount);
+        this.saveUserData();
+        this.updateWalletPage();
+        this.showToast(`Retirada de ${amount} DET do stake voluntário realizada com sucesso!`, 'success');
+    }
+
     async withdrawToSolana() {
         if (this.userData.totalBalance < 800) {
             this.showToast('Saldo mínimo para retirada é 800 DET.', 'error');
             return;
         }
-        
         try {
-            // Exemplo de integração com Solana para transferência (ajuste com seu token mint e ATA)
             const connection = new solanaWeb3.Connection(solanaWeb3.clusterApiUrl('devnet'));
             const fromPubkey = new solanaWeb3.PublicKey(this.wallet);
-            const toPubkey = new solanaWeb3.PublicKey('ENDERECO_DESTINO_AQUI'); // Ajuste para o endereço de destino
-            const tokenMint = new solanaWeb3.PublicKey('TOKEN_MINT_DET_AQUI'); // Mint do token DET
-            
-            // Obter ATAs
+            const toPubkey = new solanaWeb3.PublicKey('ENDERECO_DESTINO_AQUI'); // Substitua pelo endereço real
+            const tokenMint = new solanaWeb3.PublicKey('TOKEN_MINT_DET_AQUI'); // Substitua pelo mint do token DET
             const fromATA = await splToken.getAssociatedTokenAddress(tokenMint, fromPubkey);
             const toATA = await splToken.getAssociatedTokenAddress(tokenMint, toPubkey);
-            
-            // Criar transação
             const transaction = new solanaWeb3.Transaction().add(
                 splToken.createTransferInstruction(
                     fromATA,
@@ -654,12 +544,10 @@ class DetHabitsApp {
                     this.userData.totalBalance * 1e9 // Assumindo 9 decimais
                 )
             );
-            
             const signature = await window.solana.signAndSendTransaction(transaction);
             await connection.confirmTransaction(signature);
-            
+            this.addTransaction('withdraw', `Retirada de ${this.userData.totalBalance} DET para carteira Solana`, -this.userData.totalBalance);
             this.userData.totalBalance = 0;
-            this.addTransaction('withdraw', 'Retirada para carteira Solana', -this.userData.totalBalance);
             this.saveUserData();
             this.updateWalletPage();
             this.showToast('Retirada realizada com sucesso!', 'success');
@@ -670,14 +558,12 @@ class DetHabitsApp {
     }
 }
 
-// Initialize app when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
     window.app = new DetHabitsApp();
 });
 
-// Auto-save data periodically
 setInterval(() => {
     if (window.app) {
         window.app.saveUserData();
     }
-}, 30000); // Save every 30 seconds
+}, 30000);
