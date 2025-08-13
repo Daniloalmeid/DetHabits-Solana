@@ -119,20 +119,20 @@ class DetHabitsApp {
                 const response = await window.solana.connect();
                 this.wallet = response.publicKey.toString();
             } else {
-                // Lógica para mobile: tenta abrir o app Phantom via deep link otimizado
+                // Lógica para mobile: tenta abrir o app Phantom via deep link
                 const redirectUrl = encodeURIComponent('https://daniloalmeid.github.io/DetHabits-Solana/');
-                const deepLink = `phantom://connect?redirect=${redirectUrl}&dapp_name=DetHabits&dapp_url=${encodeURIComponent('https://daniloalmeid.github.io/DetHabits-Solana/')}&action=connect&cluster=mainnet-beta`;
-                console.log('Abrindo deep link Phantom:', deepLink);
+                const deepLink = `phantom://connect?redirect=${redirectUrl}&dapp_name=DetHabits&dapp_url=${encodeURIComponent('https://daniloalmeid.github.io/DetHabits-Solana/')}&action=connect`;
+                console.log('Abrindo deep link:', deepLink);
                 window.location.href = deepLink;
-                console.log('Deep link Phantom disparado');
+                console.log('Deep link disparado');
 
-                // Aguarda retorno (20 segundos para dar mais tempo)
-                await new Promise((resolve) => setTimeout(resolve, 20000));
+                // Aguarda retorno (15 segundos) e verifica conexão
+                await new Promise((resolve) => setTimeout(resolve, 15000));
 
                 if (!this.wallet) {
                     this.hideLoading();
                     console.log('Falha na conexão automática. Verifique o app Phantom para detalhes.');
-                    this.showToast('A conexão automática falhou. Por favor, abra https://daniloalmeid.github.io/DetHabits-Solana/ no navegador interno do app Phantom, reinicie o app se necessário, e confirme a conexão. Tente capturar a mensagem de erro, se possível.', 'info');
+                    this.showToast('A conexão automática falhou. Abra https://daniloalmeid.github.io/DetHabits-Solana/ no navegador interno do app Phantom, reinicie o app se necessário, e confirme a conexão. Se o erro persistir, tente capturar a mensagem exata do Phantom.', 'info');
                 }
             }
 
@@ -149,7 +149,7 @@ class DetHabitsApp {
         } catch (error) {
             this.hideLoading();
             console.error('Erro de conexão com a carteira:', error.message || error);
-            this.showToast('Erro ao conectar carteira. Reinicie o app Phantom, atualize-o, ou use https://daniloalmeid.github.io/DetHabits-Solana/ no navegador interno.', 'error');
+            this.showToast('Erro ao conectar carteira. Reinicie o app Phantom, atualize-o, ou use https://daniloalmeid.github.io/DetHabits-Solana/ no navegador interno do Phantom.', 'error');
         }
     }
 
