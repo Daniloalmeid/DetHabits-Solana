@@ -109,66 +109,66 @@
     </div>
 
     <!-- Wallet Page -->
-    <div id="wallet-page" class="page">
-        <div class="container">
-            <div class="page-header">
-                <h1>Minha Carteira</h1>
-                <div class="wallet-address-display" id="wallet-address-full"></div>
+<div id="wallet-page" class="page">
+    <div class="container">
+        <div class="page-header">
+            <h1>Minha Carteira</h1>
+            <div class="wallet-address-display" id="wallet-address-full"></div>
+        </div>
+        <div class="wallet-cards">
+            <div class="wallet-card main-balance">
+                <div class="card-header">
+                    <h3>Saldo Total DET</h3>
+                    <div class="det-icon">🎯</div>
+                </div>
+                <div class="balance-amount" id="total-balance">0</div>
+                <button id="withdraw-btn" class="btn-primary full-width" style="display: none;">Enviar para Carteira Solana</button>
             </div>
-            <div class="wallet-cards">
-                <div class="wallet-card main-balance">
-                    <div class="card-header">
-                        <h3>Saldo Total DET</h3>
-                        <div class="det-icon">🎯</div>
-                    </div>
-                    <div class="balance-amount" id="total-balance">0</div>
-                    <button id="withdraw-btn" class="btn-primary full-width" style="display: none;">Enviar para Carteira Solana</button>
+            <div class="wallet-card stake-balance">
+                <div class="card-header">
+                    <h3>Stake Obrigatório</h3>
+                    <div class="stake-info">300% ao ano</div>
                 </div>
-                <div class="wallet-card stake-balance">
-                    <div class="card-header">
-                        <h3>Stake Obrigatório</h3>
-                        <div class="stake-info">300% ao ano</div>
+                <div class="balance-amount" id="stake-balance">0</div>
+                <div class="stake-details">
+                    <div class="stake-detail">
+                        <span>Bloqueado por:</span>
+                        <span id="stake-time-left">90 dias</span>
                     </div>
-                    <div class="balance-amount" id="stake-balance">0</div>
-                    <div class="stake-details">
-                        <div class="stake-detail">
-                            <span>Bloqueado por:</span>
-                            <span id="stake-time-left">90 dias</span>
-                        </div>
-                        <div class="stake-detail">
-                            <span>Rendimento diário:</span>
-                            <span id="daily-yield">+0</span>
-                        </div>
+                    <div class="stake-detail">
+                        <span>Rendimento diário:</span>
+                        <span id="daily-yield">+0</span>
                     </div>
-                </div>
-                <div class="wallet-card stake-voluntary">
-                    <div class="card-header">
-                        <h3>Stake Voluntário</h3>
-                        <div class="stake-info">300% ao ano</div>
-                    </div>
-                    <div class="balance-amount" id="voluntary-stake-balance">0</div>
-                    <div class="stake-input">
-                        <input type="number" id="stake-amount-input" placeholder="Quantidade DET para stake" min="1">
-                        <button id="stake-voluntary-btn" class="btn-primary">Stake</button>
-                        <button id="unstake-voluntary-btn" class="btn-secondary">Retirar Stake</button>
-                    </div>
-                </div>
-                <div class="wallet-card spending-balance">
-                    <div class="card-header">
-                        <h3>Saldo para Compras</h3>
-                        <div class="spending-info">10% das missões</div>
-                    </div>
-                    <div class="balance-amount" id="spending-balance">0</div>
                 </div>
             </div>
-            <div class="transaction-history">
-                <h3>Histórico de Transações</h3>
-                <div class="history-list" id="transaction-history">
-                    <!-- Transaction history will be populated by JavaScript -->
+            <div class="wallet-card stake-voluntary">
+                <div class="card-header">
+                    <h3>Stake Voluntário</h3>
+                    <div class="stake-info">300% ao ano</div>
                 </div>
+                <div class="balance-amount" id="voluntary-stake-balance">0</div>
+                <div class="stake-input">
+                    <input type="number" id="stake-amount-input" placeholder="Quantidade DET para stake" min="1">
+                    <button id="stake-voluntary-btn" class="btn-primary">Stake</button>
+                    <button id="unstake-voluntary-btn" class="btn-secondary">Retirar Stake</button>
+                </div>
+            </div>
+            <div class="wallet-card spending-balance">
+                <div class="card-header">
+                    <h3>Saldo para Compras</h3>
+                    <div class="spending-info">10% das missões</div>
+                </div>
+                <div class="balance-amount" id="spending-balance">0</div>
+            </div>
+        </div>
+        <div class="transaction-history">
+            <h3>Histórico de Transações</h3>
+            <div class="history-list" id="transaction-history">
+                <!-- Transaction history will be populated by JavaScript -->
             </div>
         </div>
     </div>
+</div>
 
     <!-- Shop Page -->
     <div id="shop-page" class="page">
