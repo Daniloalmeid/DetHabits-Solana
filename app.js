@@ -13,68 +13,159 @@ class DetHabitsApp {
             dailyYieldVoluntaryAccumulated: 0,
             lastYieldResetDate: new Date().toDateString(),
             completedMissions: [],
-            transactions: []
+            transactions: [],
+            lastMissionResetDate: new Date().toDateString(),
+            dailyMissions: []
         };
-        this.missions = [
-            {
-                id: 'water',
-                title: 'Beber 1 Copo de Água',
-                description: 'Hidrate-se bebendo pelo menos um copo de água e comprove com uma foto.',
-                icon: '💧',
-                reward: 5,
-                completed: false
-            },
-            {
-                id: 'twitter',
-                title: 'Seguir no X (Twitter)',
-                description: 'Siga nossa conta oficial no X e tire um print da tela.',
-                icon: '🐦',
-                reward: 5,
-                completed: false,
-                url: 'https://x.com/seuperfil'
-            },
-            {
-                id: 'instagram',
-                title: 'Seguir no Instagram',
-                description: 'Siga nosso perfil no Instagram e compartilhe uma foto.',
-                icon: '📸',
-                reward: 5,
-                completed: false,
-                url: 'https://instagram.com/seuperfil'
-            },
-            {
-                id: 'walk',
-                title: 'Caminhar por 5 Minutos',
-                description: 'Faça uma caminhada de pelo menos 5 minutos e registre o momento.',
-                icon: '🚶',
-                reward: 5,
-                completed: false
-            },
-            {
-                id: 'meditation',
-                title: 'Meditar por 3 Minutos',
-                description: 'Dedique 3 minutos para meditação e tire uma selfie relaxante.',
-                icon: '🧘',
-                reward: 5,
-                completed: false
-            }
-        ];
+        this.allMissions = [];
+        this.missions = [];
+        this.lastMissionResetDate = new Date().toDateString();
         this.currentPage = 'home';
         this.currentMission = null;
-        this.minuteYieldRate = 300 / (365 * 24 * 60) / 100; // 300% anual dividido por 525.600 minutos no ano
-        
-        this.init();
+        this.minuteYieldRate = 300 / (365 * 24 * 60) / 100;
     }
 
-    init() {
+    async init() {
         console.log('Inicializando DetHabitsApp...');
+        await this.loadAllMissions();
         this.loadUserData();
+        this.selectDailyMissions();
         this.setupEventListeners();
         this.updateUI();
         this.startMissionTimer();
         this.loadMissions();
         this.startYieldUpdater();
         this.startBackupInterval();
+    }
+
+    async loadAllMissions() {
+        console.log('Carregando missões do missions.json...');
+        try {
+            const response = await fetch('missions.json');
+            if (!response.ok) throw new Error(`Erro HTTP: ${response.status}`);
+            this.allMissions = await response.json();
+            console.log('Missões carregadas com sucesso:', this.allMissions.length);
+        } catch (error) {
+            console.error('Erro ao carregar missões:', error);
+            this.showToast('Erro ao carregar missões. Usando lista padrão.', 'error');
+            this.allMissions = [
+                {
+                    id: 'water_1',
+                    title: 'Beber 1 Copo de Água',
+                    description: 'Hidrate-se bebendo pelo menos um copo de água e comprove com uma foto.',
+                    icon: '💧',
+                    reward: 5,
+                    completed: false
+                },
+                {
+                    id: 'walk_1',
+                    title: 'Caminhar por 5 Minutos',
+                    description: 'Faça uma caminhada de pelo menos 5 minutos e registre o momento.',
+                    icon: '🚶',
+                    reward: 5,
+                    completed: false
+                },
+                {
+                    id: 'twitter_1',
+                    title: 'Seguir no X (Twitter)',
+                    description: 'Siga nossa conta oficial no X e tire um print da tela.',
+                    icon: '🐦',
+                    reward: 5,
+                    completed: false,
+                    url: 'https://x.com/seuperfil'
+                },
+                {
+                    id: 'instagram_1',
+                    title: 'Seguir no Instagram',
+                    description: 'Siga nosso perfil no Instagram e compartilhe uma foto.',
+                    icon: '📸',
+                    reward: 5,
+                    completed: false,
+                    url: 'https://instagram.com/seuperfil'
+                },
+                {
+                    id: 'meditation_1',
+                    title: 'Meditar por 3 Minutos',
+                    description: 'Dedique 3 minutos para meditação e tire uma selfie relaxante.',
+                    icon: '🧘',
+                    reward: 5,
+                    completed: false
+                }
+            ];
+            console.log('Usando missões padrão:', this.allMissions);
+        }
+    }
+
+    selectDailyMissions() {
+        console.log('Selecionando missões diárias...');
+        const today = new Date().toDateString();
+
+        if (this.missions.length === 0 || this.lastMissionResetDate !== today) {
+            console.log('Nenhuma missão carregada ou novo dia detectado, selecionando novas missões');
+            if (this.allMissions.length === 0) {
+                console.warn('Nenhuma missão disponível em allMissions');
+                this.showToast('Nenhuma missão disponível. Tente novamente mais tarde.', 'error');
+                return;
+            }
+            const shuffledMissions = [...this.allMissions].sort(() => Math.random() - 0.5);
+            this.missions = shuffledMissions.slice(0, 5).map(mission => ({
+                ...mission,
+                completed: false
+            }));
+            this.lastMissionResetDate = today;
+            this.userData.completedMissions = [];
+            this.userData.dailyMissions = this.missions;
+            this.saveUserData();
+            this.backupUserData();
+            console.log('Missões diárias selecionadas:', this.missions);
+            this.showToast('Novas missões diárias disponíveis!', 'success');
+        } else {
+            console.log('Missões do dia já carregadas:', this.missions);
+        }
+    }
+
+    startMissionTimer() {
+        console.log('Iniciando temporizador de missões');
+        const updateTimer = () => {
+            const now = new Date();
+            const nextReset = new Date();
+            // Para testes: reset a cada 1 minuto
+            nextReset.setTime(now.getTime() + 60 * 1000); // 60 segundos = 1 minuto
+            // Para produção: reset à meia-noite do próximo dia
+            // nextReset.setDate(now.getDate() + 1);
+            // nextReset.setHours(0, 0, 0, 0);
+
+            const diff = nextReset - now;
+            console.log('Tempo até próximo reset (ms):', diff); // Log para depuração
+            const hours = Math.floor(diff / (1000 * 60 * 60));
+            const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+            const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+            console.log(`Tempo formatado: ${hours}:${minutes}:${seconds}`); // Log para depuração
+
+            const missionTimer = document.getElementById('mission-timer');
+            if (missionTimer) {
+                missionTimer.textContent = 
+                    `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            } else {
+                console.error('Elemento mission-timer não encontrado no DOM');
+                this.showToast('Erro: Temporizador de missões não encontrado.', 'error');
+            }
+
+            // Verifica se é hora de resetar as missões
+            if (diff <= 1000) {
+                console.log('Resetando missões...');
+                this.lastMissionResetDate = new Date().toDateString();
+                this.selectDailyMissions();
+                this.loadMissions();
+                this.updateMissionProgress();
+            }
+        };
+
+        // Executa imediatamente para evitar atraso inicial
+        updateTimer();
+        // Configura intervalo para atualização a cada segundo
+        const intervalId = setInterval(updateTimer, 1000);
+        console.log('setInterval configurado com ID:', intervalId);
     }
 
     setupEventListeners() {
@@ -261,7 +352,6 @@ class DetHabitsApp {
             navButton.classList.add('active');
         }
         this.currentPage = page;
-        // Fecha o menu móvel automaticamente, se estiver aberto
         const navLinks = document.querySelector('.nav-links');
         if (navLinks && navLinks.classList.contains('mobile-active')) {
             this.toggleMobileMenu();
@@ -276,21 +366,30 @@ class DetHabitsApp {
     }
 
     loadMissions() {
-        console.log('Carregando missões...');
+        console.log('Carregando missões para exibição...');
         const missionsGrid = document.getElementById('missions-grid');
-        if (missionsGrid) {
-            missionsGrid.innerHTML = '';
-            this.missions.forEach(mission => {
-                const missionCard = this.createMissionCard(mission);
-                missionsGrid.appendChild(missionCard);
-            });
-            this.updateMissionProgress();
-        } else {
-            console.error('Elemento missions-grid não encontrado');
+        if (!missionsGrid) {
+            console.error('Elemento missions-grid não encontrado no DOM');
+            this.showToast('Erro ao carregar missões: elemento missions-grid não encontrado.', 'error');
+            return;
         }
+        missionsGrid.innerHTML = '';
+        if (this.missions.length === 0) {
+            console.warn('Nenhuma missão disponível para exibir');
+            missionsGrid.innerHTML = '<p style="text-align: center; color: var(--gray-500); padding: 2rem;">Nenhuma missão disponível</p>';
+            this.showToast('Nenhuma missão disponível. Tente novamente.', 'error');
+            return;
+        }
+        this.missions.forEach(mission => {
+            const missionCard = this.createMissionCard(mission);
+            missionsGrid.appendChild(missionCard);
+        });
+        this.updateMissionProgress();
+        console.log('Missões exibidas:', this.missions);
     }
 
     createMissionCard(mission) {
+        console.log('Criando cartão para missão:', mission.id);
         const card = document.createElement('div');
         card.className = `mission-card ${mission.completed ? 'completed' : ''}`;
         let linkHtml = mission.url ? `<a href="${mission.url}" target="_blank" class="mission-link">Abrir Perfil</a>` : '';
@@ -426,10 +525,14 @@ class DetHabitsApp {
         const dailyProgress = document.getElementById('daily-progress');
         if (dailyProgress) {
             dailyProgress.style.width = `${progressPercentage}%`;
+        } else {
+            console.error('Elemento daily-progress não encontrado');
         }
         const completedMissions = document.getElementById('completed-missions');
         if (completedMissions) {
             completedMissions.textContent = completedCount;
+        } else {
+            console.error('Elemento completed-missions não encontrado');
         }
     }
 
@@ -464,10 +567,6 @@ class DetHabitsApp {
         const dailyYieldElement = document.getElementById('daily-yield');
         if (dailyYieldElement) {
             dailyYieldElement.textContent = `+${this.userData.dailyYieldObligatoryAccumulated.toFixed(5)}`;
-        }
-        const dailyYieldVoluntaryElement = document.getElementById('daily-yield-voluntary');
-        if (dailyYieldVoluntaryElement) {
-            dailyYieldVoluntaryElement.textContent = `+${this.userData.dailyYieldVoluntaryAccumulated.toFixed(5)}`;
         }
         const withdrawBtn = document.getElementById('withdraw-btn');
         if (withdrawBtn) {
@@ -538,27 +637,6 @@ class DetHabitsApp {
         });
     }
 
-    startMissionTimer() {
-        console.log('Iniciando temporizador de missões');
-        const updateTimer = () => {
-            const now = new Date();
-            const tomorrow = new Date();
-            tomorrow.setDate(tomorrow.getDate() + 1);
-            tomorrow.setHours(0, 0, 0, 0);
-            const diff = tomorrow - now;
-            const hours = Math.floor(diff / (1000 * 60 * 60));
-            const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-            const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-            const missionTimer = document.getElementById('mission-timer');
-            if (missionTimer) {
-                missionTimer.textContent = 
-                    `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-            }
-        };
-        updateTimer();
-        setInterval(updateTimer, 1000);
-    }
-
     async getSolPrice() {
         try {
             const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd');
@@ -566,7 +644,7 @@ class DetHabitsApp {
             return data.solana.usd;
         } catch (error) {
             console.error('Erro ao obter preço do SOL:', error);
-            return 150; // Valor padrão em caso de erro
+            return 150;
         }
     }
 
@@ -575,7 +653,7 @@ class DetHabitsApp {
         const solAmount = parseFloat(event.target.value) || 0;
         const solToUsd = await this.getSolPrice();
         const usdAmount = solAmount * solToUsd;
-        const detAmount = usdAmount / 0.02; // $0.02 por DET
+        const detAmount = usdAmount / 0.02;
         const detAmountElement = document.getElementById('det-amount');
         if (detAmountElement) {
             detAmountElement.value = detAmount.toLocaleString('pt-BR', { maximumFractionDigits: 0 });
@@ -682,7 +760,9 @@ class DetHabitsApp {
             typeof data.dailyYieldVoluntaryAccumulated === 'number' &&
             typeof data.lastYieldResetDate === 'string' &&
             Array.isArray(data.completedMissions) &&
-            Array.isArray(data.transactions)
+            Array.isArray(data.transactions) &&
+            (typeof data.lastMissionResetDate === 'string' || data.lastMissionResetDate === undefined) &&
+            (Array.isArray(data.dailyMissions) || data.dailyMissions === undefined)
         );
     }
 
@@ -709,19 +789,20 @@ class DetHabitsApp {
                         dailyYieldVoluntaryAccumulated: Number(data.dailyYieldVoluntaryAccumulated) || 0,
                         lastYieldResetDate: data.lastYieldResetDate || new Date().toDateString(),
                         completedMissions: data.completedMissions || [],
-                        transactions: data.transactions || []
+                        transactions: data.transactions || [],
+                        lastMissionResetDate: data.lastMissionResetDate || new Date().toDateString(),
+                        dailyMissions: data.dailyMissions || []
                     };
-                    if (data.completedMissions) {
-                        data.completedMissions.forEach(completed => {
-                            const mission = this.missions.find(m => m.id === completed.id);
-                            if (mission) {
-                                const completedDate = new Date(completed.completedAt).toDateString();
-                                const today = new Date().toDateString();
-                                mission.completed = completedDate === today;
-                            }
+                    if (this.userData.dailyMissions.length > 0 && this.userData.lastMissionResetDate === new Date().toDateString()) {
+                        this.missions = this.userData.dailyMissions;
+                        this.lastMissionResetDate = this.userData.lastMissionResetDate;
+                        this.missions.forEach(mission => {
+                            const completed = this.userData.completedMissions.find(cm => cm.id === mission.id);
+                            mission.completed = completed && new Date(completed.completedAt).toDateString() === new Date().toDateString();
                         });
+                    } else {
+                        this.selectDailyMissions();
                     }
-                    // Resetar acumuladores se o dia mudou
                     const today = new Date().toDateString();
                     if (this.userData.lastYieldResetDate !== today) {
                         this.userData.dailyYieldObligatoryAccumulated = 0;
@@ -729,7 +810,6 @@ class DetHabitsApp {
                         this.userData.lastYieldResetDate = today;
                         this.saveUserData();
                         this.backupUserData();
-                        console.log('Acumuladores de rendimento resetados para o novo dia');
                     }
                     console.log('Dados carregados com sucesso');
                     return;
@@ -740,7 +820,6 @@ class DetHabitsApp {
                 console.error('Erro ao carregar dados primários:', error);
             }
         }
-        // Tenta carregar do backup
         const backup = localStorage.getItem(`dethabits_backup_${this.wallet}`);
         if (backup) {
             try {
@@ -757,26 +836,27 @@ class DetHabitsApp {
                         dailyYieldVoluntaryAccumulated: Number(data.dailyYieldVoluntaryAccumulated) || 0,
                         lastYieldResetDate: data.lastYieldResetDate || new Date().toDateString(),
                         completedMissions: data.completedMissions || [],
-                        transactions: data.transactions || []
+                        transactions: data.transactions || [],
+                        lastMissionResetDate: data.lastMissionResetDate || new Date().toDateString(),
+                        dailyMissions: data.dailyMissions || []
                     };
-                    if (data.completedMissions) {
-                        data.completedMissions.forEach(completed => {
-                            const mission = this.missions.find(m => m.id === completed.id);
-                            if (mission) {
-                                const completedDate = new Date(completed.completedAt).toDateString();
-                                const today = new Date().toDateString();
-                                mission.completed = completedDate === today;
-                            }
+                    if (this.userData.dailyMissions.length > 0 && this.userData.lastMissionResetDate === new Date().toDateString()) {
+                        this.missions = this.userData.dailyMissions;
+                        this.lastMissionResetDate = this.userData.lastMissionResetDate;
+                        this.missions.forEach(mission => {
+                            const completed = this.userData.completedMissions.find(cm => cm.id === mission.id);
+                            mission.completed = completed && new Date(completed.completedAt).toDateString() === new Date().toDateString();
                         });
+                    } else {
+                        this.selectDailyMissions();
                     }
-                    // Resetar acumuladores se o dia mudou
                     const today = new Date().toDateString();
                     if (this.userData.lastYieldResetDate !== today) {
                         this.userData.dailyYieldObligatoryAccumulated = 0;
                         this.userData.dailyYieldVoluntaryAccumulated = 0;
                         this.userData.lastYieldResetDate = today;
                         this.saveUserData();
-                        console.log('Acumuladores de rendimento resetados para o novo dia');
+                        this.backupUserData();
                     }
                     console.log('Dados restaurados do backup com sucesso');
                     this.saveUserData();
@@ -788,7 +868,6 @@ class DetHabitsApp {
                 console.error('Erro ao carregar dados de backup:', error);
             }
         }
-        // Se não houver dados válidos, inicializa com valores padrão
         this.userData = {
             totalBalance: 0,
             stakeBalance: 0,
@@ -800,12 +879,15 @@ class DetHabitsApp {
             dailyYieldVoluntaryAccumulated: 0,
             lastYieldResetDate: new Date().toDateString(),
             completedMissions: [],
-            transactions: []
+            transactions: [],
+            lastMissionResetDate: new Date().toDateString(),
+            dailyMissions: []
         };
-        this.missions.forEach(mission => mission.completed = false);
-        console.log('Dados inicializados com valores padrão');
+        this.missions = [];
+        this.selectDailyMissions();
         this.saveUserData();
         this.backupUserData();
+        console.log('Dados inicializados com valores padrão');
     }
 
     saveUserData() {
@@ -815,8 +897,13 @@ class DetHabitsApp {
         }
         console.log('Salvando dados do usuário para carteira:', this.wallet);
         try {
-            if (this.validateUserData(this.userData)) {
-                localStorage.setItem(`dethabits_data_${this.wallet}`, JSON.stringify(this.userData));
+            const data = {
+                ...this.userData,
+                lastMissionResetDate: this.lastMissionResetDate,
+                dailyMissions: this.missions
+            };
+            if (this.validateUserData(data)) {
+                localStorage.setItem(`dethabits_data_${this.wallet}`, JSON.stringify(data));
             } else {
                 console.error('Dados inválidos, não salvando');
                 this.showToast('Erro ao salvar dados. Exporte seus dados manualmente.', 'error');
@@ -850,7 +937,7 @@ class DetHabitsApp {
             if (this.wallet) {
                 this.backupUserData();
             }
-        }, 60000); // Backup a cada 1 minuto
+        }, 60000);
     }
 
     exportUserData() {
@@ -896,7 +983,9 @@ class DetHabitsApp {
                         dailyYieldVoluntaryAccumulated: Number(data.dailyYieldVoluntaryAccumulated) || 0,
                         lastYieldResetDate: data.lastYieldResetDate || new Date().toDateString(),
                         completedMissions: data.completedMissions || [],
-                        transactions: data.transactions || []
+                        transactions: data.transactions || [],
+                        lastMissionResetDate: data.lastMissionResetDate || new Date().toDateString(),
+                        dailyMissions: data.dailyMissions || []
                     };
                     this.saveUserData();
                     this.backupUserData();
@@ -965,7 +1054,7 @@ class DetHabitsApp {
             } else {
                 console.log('Nenhum saldo em stake voluntário, pulando atualização');
             }
-        }, 60000); // 1 minuto
+        }, 60000);
     }
 
     stakeVoluntary() {
@@ -1036,7 +1125,7 @@ class DetHabitsApp {
                 console.log('Conta de token associada criada:', signature);
             }
 
-            const amount = this.userData.totalBalance * 1e9; // Assumindo 9 decimais para o token DET
+            const amount = this.userData.totalBalance * 1e9;
             const transaction = new solanaWeb3.Transaction().add(
                 splToken.createTransferInstruction(
                     fromATA,
@@ -1068,11 +1157,5 @@ class DetHabitsApp {
 document.addEventListener('DOMContentLoaded', () => {
     console.log('DOM carregado, inicializando app');
     window.app = new DetHabitsApp();
+    window.app.init();
 });
-
-setInterval(() => {
-    if (window.app) {
-        window.app.saveUserData();
-        window.app.backupUserData();
-    }
-}, 30000);
