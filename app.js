@@ -8,7 +8,10 @@ class DetHabitsApp {
             spendingBalance: 0,
             voluntaryStakeBalance: 0,
             completedMissions: [],
-            transactions: []
+            transactions: [],
+            dailyYieldObligatoryAccumulated: 0, // Novo: acumulado do dia para stake obrigatório
+            dailyYieldVoluntaryAccumulated: 0, // Novo: acumulado do dia para stake voluntário
+            lastYieldResetDate: new Date().toDateString() // Novo: data do último reset
         };
         this.missions = [
             {
@@ -458,7 +461,11 @@ class DetHabitsApp {
         }
         const dailyYieldElement = document.getElementById('daily-yield');
         if (dailyYieldElement) {
-            dailyYieldElement.textContent = `+${Math.floor(this.userData.stakeBalance * 0.008) || 0}`;
+            dailyYieldElement.textContent = `+${this.userData.dailyYieldObligatoryAccumulated || 0}`;
+        }
+        const dailyYieldVoluntaryElement = document.getElementById('daily-yield-voluntary');
+        if (dailyYieldVoluntaryElement) {
+            dailyYieldVoluntaryElement.textContent = `+${this.userData.dailyYieldVoluntaryAccumulated || 0}`;
         }
         const withdrawBtn = document.getElementById('withdraw-btn');
         if (withdrawBtn) {
@@ -520,7 +527,7 @@ class DetHabitsApp {
             item.innerHTML = `
                 <div class="transaction-info">
                     <div class="transaction-icon ${transaction.type}">
-                        ${transaction.type === 'mission' ? '🎯' : transaction.type === 'stake' || transaction.type === 'unstake' ? '🏦' : transaction.type === 'withdraw' ? '↗️' : transaction.type === 'presale' ? '💰' : '🛍️'}
+                        ${transaction.type === 'mission' ? '🎯' : transaction.type === 'stake' || transaction.type === 'unstake' ? '🏦' : transaction.type === 'yield' ? '💸' : transaction.type === 'withdraw' ? '↗️' : transaction.type === 'presale' ? '💰' : '🛍️'}
                     </div>
                     <div class="transaction-details">
                         <h4>${transaction.description}</h4>
@@ -673,6 +680,9 @@ class DetHabitsApp {
             typeof data.stakeBalance === 'number' &&
             typeof data.spendingBalance === 'number' &&
             typeof data.voluntaryStakeBalance === 'number' &&
+            typeof data.dailyYieldObligatoryAccumulated === 'number' &&
+            typeof data.dailyYieldVoluntaryAccumulated === 'number' &&
+            typeof data.lastYieldResetDate === 'string' &&
             Array.isArray(data.completedMissions) &&
             Array.isArray(data.transactions)
         );
@@ -695,6 +705,9 @@ class DetHabitsApp {
                         stakeBalance: Number(data.stakeBalance) || 0,
                         spendingBalance: Number(data.spendingBalance) || 0,
                         voluntaryStakeBalance: Number(data.voluntaryStakeBalance) || 0,
+                        dailyYieldObligatoryAccumulated: Number(data.dailyYieldObligatoryAccumulated) || 0,
+                        dailyYieldVoluntaryAccumulated: Number(data.dailyYieldVoluntaryAccumulated) || 0,
+                        lastYieldResetDate: data.lastYieldResetDate || new Date().toDateString(),
                         completedMissions: data.completedMissions || [],
                         transactions: data.transactions || []
                     };
@@ -707,6 +720,16 @@ class DetHabitsApp {
                                 mission.completed = completedDate === today;
                             }
                         });
+                    }
+                    // Resetar acumuladores se o dia mudou
+                    const today = new Date().toDateString();
+                    if (this.userData.lastYieldResetDate !== today) {
+                        this.userData.dailyYieldObligatoryAccumulated = 0;
+                        this.userData.dailyYieldVoluntaryAccumulated = 0;
+                        this.userData.lastYieldResetDate = today;
+                        this.saveUserData();
+                        this.backupUserData();
+                        console.log('Acumuladores de rendimento diário resetados para o novo dia');
                     }
                     console.log('Dados carregados com sucesso');
                     return;
@@ -728,6 +751,9 @@ class DetHabitsApp {
                         stakeBalance: Number(data.stakeBalance) || 0,
                         spendingBalance: Number(data.spendingBalance) || 0,
                         voluntaryStakeBalance: Number(data.voluntaryStakeBalance) || 0,
+                        dailyYieldObligatoryAccumulated: Number(data.dailyYieldObligatoryAccumulated) || 0,
+                        dailyYieldVoluntaryAccumulated: Number(data.dailyYieldVoluntaryAccumulated) || 0,
+                        lastYieldResetDate: data.lastYieldResetDate || new Date().toDateString(),
                         completedMissions: data.completedMissions || [],
                         transactions: data.transactions || []
                     };
@@ -740,6 +766,15 @@ class DetHabitsApp {
                                 mission.completed = completedDate === today;
                             }
                         });
+                    }
+                    // Resetar acumuladores se o dia mudou
+                    const today = new Date().toDateString();
+                    if (this.userData.lastYieldResetDate !== today) {
+                        this.userData.dailyYieldObligatoryAccumulated = 0;
+                        this.userData.dailyYieldVoluntaryAccumulated = 0;
+                        this.userData.lastYieldResetDate = today;
+                        this.saveUserData();
+                        console.log('Acumuladores de rendimento diário resetados para o novo dia');
                     }
                     console.log('Dados restaurados do backup com sucesso');
                     this.saveUserData();
@@ -757,6 +792,9 @@ class DetHabitsApp {
             stakeBalance: 0,
             spendingBalance: 0,
             voluntaryStakeBalance: 0,
+            dailyYieldObligatoryAccumulated: 0,
+            dailyYieldVoluntaryAccumulated: 0,
+            lastYieldResetDate: new Date().toDateString(),
             completedMissions: [],
             transactions: []
         };
@@ -848,6 +886,9 @@ class DetHabitsApp {
                         stakeBalance: Number(data.stakeBalance) || 0,
                         spendingBalance: Number(data.spendingBalance) || 0,
                         voluntaryStakeBalance: Number(data.voluntaryStakeBalance) || 0,
+                        dailyYieldObligatoryAccumulated: Number(data.dailyYieldObligatoryAccumulated) || 0,
+                        dailyYieldVoluntaryAccumulated: Number(data.dailyYieldVoluntaryAccumulated) || 0,
+                        lastYieldResetDate: data.lastYieldResetDate || new Date().toDateString(),
                         completedMissions: data.completedMissions || [],
                         transactions: data.transactions || []
                     };
@@ -891,6 +932,7 @@ class DetHabitsApp {
                 const fiveMinuteYield = Math.max(1, Math.floor(calculatedYield)); // Garante pelo menos 1 DET
                 console.log(`Rendimento stake obrigatório: ${fiveMinuteYield} DET (calculado: ${calculatedYield})`);
                 this.userData.stakeBalance += fiveMinuteYield;
+                this.userData.dailyYieldObligatoryAccumulated += fiveMinuteYield;
                 this.saveUserData();
                 this.backupUserData();
                 this.updateUI();
@@ -905,6 +947,7 @@ class DetHabitsApp {
                 const fiveMinuteYield = Math.max(1, Math.floor(calculatedYield)); // Garante pelo menos 1 DET
                 console.log(`Rendimento stake voluntário: ${fiveMinuteYield} DET (calculado: ${calculatedYield})`);
                 this.userData.voluntaryStakeBalance += fiveMinuteYield;
+                this.userData.dailyYieldVoluntaryAccumulated += fiveMinuteYield;
                 this.saveUserData();
                 this.backupUserData();
                 this.updateUI();

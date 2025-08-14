@@ -104,7 +104,6 @@
                     <div class="withdraw-container">
                         <button id="withdraw-btn" class="full-width">Enviar para Carteira Solana</button>
                         <span class="withdraw-notice">Saque mínimo: 800 DET</span>
-                        <button id="export-data-btn" class="btn-secondary full-width">Exportar Dados</button>
                     </div>
                 </div>
                 <div class="wallet-card stake-balance">
@@ -130,6 +129,12 @@
                         <div class="stake-info">300% ao ano</div>
                     </div>
                     <div class="balance-amount" id="voluntary-stake-balance">0</div>
+                    <div class="stake-details">
+                        <div class="stake-detail">
+                            <span>Rendimento diário:</span>
+                            <span id="daily-yield-voluntary">+0</span>
+                        </div>
+                    </div>
                     <div class="stake-input">
                         <input type="number" id="stake-amount-input" placeholder="Quantidade DET para stake" min="1">
                         <button id="stake-voluntary-btn" class="btn-primary">Stake</button>
@@ -212,7 +217,7 @@
                 <div class="wp-section">
                     <h2>2. Problema & Solução</h2>
                     <p>Milhões de pessoas desejam melhorar seus hábitos, mas enfrentam um problema comum: falta de motivação.</p>
-                    <p>O DET Habits oferece um incentivo financeiro real para completar metas diárias. A recompensa instantânea em tokens DET ajuda os usuários a permanecerem engajados e disciplinados — com diversão, simplicidade e valor no mundo real.</p>
+                    <p>O DET Habits oferece um incentivo financeiro real para complete metas diárias. A recompensa instantânea em tokens DET ajuda os usuários a permanecerem engajados e disciplinados — com diversão, simplicidade e valor no mundo real.</p>
                 </div>
                 <div class="wp-section">
                     <h2>3. O que é DET Habits?</h2>
@@ -426,13 +431,18 @@
     </div>
 
     <!-- Presale Page -->
-    <div id="presale-page" class="page presale-page">
-        <div class="presale-container">
-            <div class="presale-info">
+    <div id="presale-page" class="page">
+        <div class="container">
+            <div class="page-header">
                 <h1>Pré-venda do DET</h1>
-                <div class="presale-banner">🔔 Pré-venda será ativada em breve com contrato inteligente!</div>
-                <p>Adquira tokens DET por apenas <strong>$0.02</strong> cada. Participe da pré-venda com 10.000.000 DET disponíveis (10% do supply total).</p>
-                <p><strong>Objetivo:</strong> Financiar o desenvolvimento e expansão do DET Habits, trazendo hábitos saudáveis e recompensas financeiras para todos.</p>
+                <div class="status-badge">Aberta em Q2 2025</div>
+            </div>
+            <div class="presale-hero">
+                <div class="presale-info">
+                    <h2>Participe da Pré-venda do DET</h2>
+                    <p>Adquira tokens DET por $0.02 cada. Supply da pré-venda: 10.000.000 DET (10% do total). Mínimo: 500 DET ($10). Máximo: 100.000 DET ($2.000).</p>
+                    <p>Objetivo: Financiar o desenvolvimento e expansão do DET Habits.</p>
+                </div>
                 <div class="presale-stats">
                     <div class="stat-card">
                         <div class="stat-number">$0.02</div>
@@ -447,68 +457,73 @@
                         <div class="stat-label">Compra Máxima</div>
                     </div>
                 </div>
-                <h3>Alocação dos Fundos</h3>
-                <table class="presale-table">
-                    <thead>
-                        <tr>
-                            <th>Uso dos Fundos</th>
-                            <th>Porcentagem</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td>Liquidez (DEXs)</td>
-                            <td>70%</td>
-                        </tr>
-                        <tr>
-                            <td>Marketing</td>
-                            <td>20%</td>
-                        </tr>
-                        <tr>
-                            <td>Desenvolvimento do Aplicativo</td>
-                            <td>10%</td>
-                        </tr>
-                    </tbody>
-                </table>
-                <h3>Benefícios VIP</h3>
-                <p>Participe da pré-venda e ganhe acesso a missões VIP com bônus exclusivos:</p>
-                <table class="vip-table">
-                    <thead>
-                        <tr>
-                            <th>DET na Carteira</th>
-                            <th>Bônus VIP por Missão</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td>500 a 4.999 DET</td>
-                            <td>+5%</td>
-                        </tr>
-                        <tr>
-                            <td>5.000 a 49.999 DET</td>
-                            <td>+15%</td>
-                        </tr>
-                        <tr>
-                            <td>50.000 a 100.000 DET</td>
-                            <td>+25%</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-            <div class="presale-calculator">
-                <h3>Calculadora de Pré-venda</h3>
-                <p>Veja quantos DET você pode adquirir com SOL:</p>
-                <div class="calculator-form">
-                    <div class="input-group">
-                        <label for="sol-amount">Quantidade em SOL</label>
-                        <input type="number" id="sol-amount" placeholder="0.0" min="0" step="0.01">
+                <div class="presale-calculator">
+                    <h3>Calculadora de Pré-venda</h3>
+                    <div class="calculator-form">
+                        <div class="input-group">
+                            <label for="sol-amount">Quantidade em SOL</label>
+                            <input type="number" id="sol-amount" placeholder="0.0" min="0" step="0.01">
+                        </div>
+                        <div class="conversion-arrow">↓</div>
+                        <div class="input-group">
+                            <label for="det-amount">Quantidade em DET</label>
+                            <input type="text" id="det-amount" readonly>
+                        </div>
+                        <button id="buy-presale-btn" class="btn-primary full-width">Comprar DET</button>
                     </div>
-                    <div class="conversion-arrow">↓</div>
-                    <div class="input-group">
-                        <label for="det-amount">Quantidade em DET</label>
-                        <input type="text" id="det-amount" readonly>
+                    <div class="presale-instructions">
+                        <p>Para participar, envie SOL para a carteira: <span id="presale-wallet">5mhUnFERAUbES9dmFc1GhsXHHNS5WhKdj9Xw8KZbBzGw</span></p>
+                        <button id="copy-presale-wallet-btn" class="btn-secondary">Copiar Carteira</button>
                     </div>
-                    <button id="buy-presale-btn" class="btn-primary full-width">Comprar DET</button>
+                </div>
+                <div class="presale-details">
+                    <h3>Alocação dos Fundos</h3>
+                    <table class="presale-table">
+                        <thead>
+                            <tr>
+                                <th>Uso dos Fundos</th>
+                                <th>Porcentagem</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Liquidez (DEXs)</td>
+                                <td>70%</td>
+                            </tr>
+                            <tr>
+                                <td>Marketing</td>
+                                <td>20%</td>
+                            </tr>
+                            <tr>
+                                <td>Desenvolvimento do Aplicativo</td>
+                                <td>10%</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <h3>Benefícios da Pré-venda</h3>
+                    <p>Usuários que participarem da pré-venda ganharão acesso a missões VIP exclusivas com bônus proporcionais, com base na quantidade de tokens DET que possuem.</p>
+                    <table class="vip-table">
+                        <thead>
+                            <tr>
+                                <th>DET na Carteira</th>
+                                <th>Bônus VIP por Missão</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>500 a 4.999 DET</td>
+                                <td>+5%</td>
+                            </tr>
+                            <tr>
+                                <td>5.000 a 49.999 DET</td>
+                                <td>+15%</td>
+                            </tr>
+                            <tr>
+                                <td>50.000 a 100.000 DET</td>
+                                <td>+25%</td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>

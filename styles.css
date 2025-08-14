@@ -400,6 +400,7 @@ body {
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
+    margin-bottom: 1rem;
 }
 
 .stake-detail {
@@ -756,6 +757,11 @@ body {
     cursor: pointer;
 }
 
+.modal-body {
+    max-height: 80vh;
+    overflow-y: auto;
+}
+
 .photo-upload-area {
     text-align: center;
     margin-bottom: 1rem;
@@ -776,8 +782,10 @@ body {
 
 #photo-preview img {
     max-width: 100%;
-    border-radius: 5px;
-    margin-top: 1rem;
+    height: auto;
+    max-height: 200px; /* Limita a altura para evitar que o preview empurre o botão para fora da tela */
+    display: block;
+    margin: 0 auto;
 }
 
 /* Loading Overlay */
