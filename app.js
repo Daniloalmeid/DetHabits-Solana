@@ -7,11 +7,13 @@ class DetHabitsApp {
             stakeBalance: 0,
             spendingBalance: 0,
             voluntaryStakeBalance: 0,
+            fractionalYieldObligatory: 0,
+            fractionalYieldVoluntary: 0,
+            dailyYieldObligatoryAccumulated: 0,
+            dailyYieldVoluntaryAccumulated: 0,
+            lastYieldResetDate: new Date().toDateString(),
             completedMissions: [],
-            transactions: [],
-            dailyYieldObligatoryAccumulated: 0, // Novo: acumulado do dia para stake obrigatório
-            dailyYieldVoluntaryAccumulated: 0, // Novo: acumulado do dia para stake voluntário
-            lastYieldResetDate: new Date().toDateString() // Novo: data do último reset
+            transactions: []
         };
         this.missions = [
             {
@@ -59,7 +61,7 @@ class DetHabitsApp {
         ];
         this.currentPage = 'home';
         this.currentMission = null;
-        this.fiveMinuteYieldRate = 300 / (8760 * 12) / 100; // 300% ao ano dividido por 105.120 intervalos de 5 minutos
+        this.minuteYieldRate = 300 / (365 * 24 * 60) / 100; // 300% anual dividido por 525.600 minutos no ano
         
         this.init();
     }
@@ -445,37 +447,31 @@ class DetHabitsApp {
         console.log('Atualizando página da wallet');
         const totalBalanceElement = document.getElementById('total-balance');
         if (totalBalanceElement) {
-            totalBalanceElement.textContent = this.userData.totalBalance || 0;
+            totalBalanceElement.textContent = this.userData.totalBalance.toFixed(0) || 0;
         }
         const stakeBalanceElement = document.getElementById('stake-balance');
         if (stakeBalanceElement) {
-            stakeBalanceElement.textContent = this.userData.stakeBalance || 0;
+            stakeBalanceElement.textContent = this.userData.stakeBalance.toFixed(0) || 0;
         }
         const spendingBalanceElement = document.getElementById('spending-balance');
         if (spendingBalanceElement) {
-            spendingBalanceElement.textContent = this.userData.spendingBalance || 0;
+            spendingBalanceElement.textContent = this.userData.spendingBalance.toFixed(0) || 0;
         }
         const voluntaryStakeBalanceElement = document.getElementById('voluntary-stake-balance');
         if (voluntaryStakeBalanceElement) {
-            voluntaryStakeBalanceElement.textContent = this.userData.voluntaryStakeBalance || 0;
+            voluntaryStakeBalanceElement.textContent = this.userData.voluntaryStakeBalance.toFixed(0) || 0;
         }
         const dailyYieldElement = document.getElementById('daily-yield');
         if (dailyYieldElement) {
-            dailyYieldElement.textContent = `+${this.userData.dailyYieldObligatoryAccumulated || 0}`;
+            dailyYieldElement.textContent = `+${this.userData.dailyYieldObligatoryAccumulated.toFixed(5)}`;
         }
         const dailyYieldVoluntaryElement = document.getElementById('daily-yield-voluntary');
         if (dailyYieldVoluntaryElement) {
-            dailyYieldVoluntaryElement.textContent = `+${this.userData.dailyYieldVoluntaryAccumulated || 0}`;
+            dailyYieldVoluntaryElement.textContent = `+${this.userData.dailyYieldVoluntaryAccumulated.toFixed(5)}`;
         }
         const withdrawBtn = document.getElementById('withdraw-btn');
         if (withdrawBtn) {
-            if (this.userData.totalBalance >= 800) {
-                withdrawBtn.classList.add('enabled');
-                withdrawBtn.disabled = false;
-            } else {
-                withdrawBtn.classList.remove('enabled');
-                withdrawBtn.disabled = true;
-            }
+            withdrawBtn.disabled = this.userData.totalBalance < 800;
         }
         this.loadTransactionHistory();
     }
@@ -484,7 +480,7 @@ class DetHabitsApp {
         console.log('Atualizando página da loja');
         const shopBalanceElement = document.getElementById('shop-balance');
         if (shopBalanceElement) {
-            shopBalanceElement.textContent = `${this.userData.spendingBalance} DET`;
+            shopBalanceElement.textContent = `${this.userData.spendingBalance.toFixed(0)} DET`;
         }
     }
 
@@ -680,6 +676,8 @@ class DetHabitsApp {
             typeof data.stakeBalance === 'number' &&
             typeof data.spendingBalance === 'number' &&
             typeof data.voluntaryStakeBalance === 'number' &&
+            typeof data.fractionalYieldObligatory === 'number' &&
+            typeof data.fractionalYieldVoluntary === 'number' &&
             typeof data.dailyYieldObligatoryAccumulated === 'number' &&
             typeof data.dailyYieldVoluntaryAccumulated === 'number' &&
             typeof data.lastYieldResetDate === 'string' &&
@@ -705,6 +703,8 @@ class DetHabitsApp {
                         stakeBalance: Number(data.stakeBalance) || 0,
                         spendingBalance: Number(data.spendingBalance) || 0,
                         voluntaryStakeBalance: Number(data.voluntaryStakeBalance) || 0,
+                        fractionalYieldObligatory: Number(data.fractionalYieldObligatory) || 0,
+                        fractionalYieldVoluntary: Number(data.fractionalYieldVoluntary) || 0,
                         dailyYieldObligatoryAccumulated: Number(data.dailyYieldObligatoryAccumulated) || 0,
                         dailyYieldVoluntaryAccumulated: Number(data.dailyYieldVoluntaryAccumulated) || 0,
                         lastYieldResetDate: data.lastYieldResetDate || new Date().toDateString(),
@@ -729,7 +729,7 @@ class DetHabitsApp {
                         this.userData.lastYieldResetDate = today;
                         this.saveUserData();
                         this.backupUserData();
-                        console.log('Acumuladores de rendimento diário resetados para o novo dia');
+                        console.log('Acumuladores de rendimento resetados para o novo dia');
                     }
                     console.log('Dados carregados com sucesso');
                     return;
@@ -751,6 +751,8 @@ class DetHabitsApp {
                         stakeBalance: Number(data.stakeBalance) || 0,
                         spendingBalance: Number(data.spendingBalance) || 0,
                         voluntaryStakeBalance: Number(data.voluntaryStakeBalance) || 0,
+                        fractionalYieldObligatory: Number(data.fractionalYieldObligatory) || 0,
+                        fractionalYieldVoluntary: Number(data.fractionalYieldVoluntary) || 0,
                         dailyYieldObligatoryAccumulated: Number(data.dailyYieldObligatoryAccumulated) || 0,
                         dailyYieldVoluntaryAccumulated: Number(data.dailyYieldVoluntaryAccumulated) || 0,
                         lastYieldResetDate: data.lastYieldResetDate || new Date().toDateString(),
@@ -774,7 +776,7 @@ class DetHabitsApp {
                         this.userData.dailyYieldVoluntaryAccumulated = 0;
                         this.userData.lastYieldResetDate = today;
                         this.saveUserData();
-                        console.log('Acumuladores de rendimento diário resetados para o novo dia');
+                        console.log('Acumuladores de rendimento resetados para o novo dia');
                     }
                     console.log('Dados restaurados do backup com sucesso');
                     this.saveUserData();
@@ -792,6 +794,8 @@ class DetHabitsApp {
             stakeBalance: 0,
             spendingBalance: 0,
             voluntaryStakeBalance: 0,
+            fractionalYieldObligatory: 0,
+            fractionalYieldVoluntary: 0,
             dailyYieldObligatoryAccumulated: 0,
             dailyYieldVoluntaryAccumulated: 0,
             lastYieldResetDate: new Date().toDateString(),
@@ -886,6 +890,8 @@ class DetHabitsApp {
                         stakeBalance: Number(data.stakeBalance) || 0,
                         spendingBalance: Number(data.spendingBalance) || 0,
                         voluntaryStakeBalance: Number(data.voluntaryStakeBalance) || 0,
+                        fractionalYieldObligatory: Number(data.fractionalYieldObligatory) || 0,
+                        fractionalYieldVoluntary: Number(data.fractionalYieldVoluntary) || 0,
                         dailyYieldObligatoryAccumulated: Number(data.dailyYieldObligatoryAccumulated) || 0,
                         dailyYieldVoluntaryAccumulated: Number(data.dailyYieldVoluntaryAccumulated) || 0,
                         lastYieldResetDate: data.lastYieldResetDate || new Date().toDateString(),
@@ -924,40 +930,42 @@ class DetHabitsApp {
     }
 
     startYieldUpdater() {
-        console.log('Iniciando atualizador de rendimento a cada 5 minutos');
+        console.log('Iniciando atualizador de rendimento a cada minuto');
         setInterval(() => {
             console.log('Verificando rendimentos...');
             if (this.userData.stakeBalance > 0) {
-                const calculatedYield = this.userData.stakeBalance * this.fiveMinuteYieldRate;
-                const fiveMinuteYield = Math.max(1, Math.floor(calculatedYield)); // Garante pelo menos 1 DET
-                console.log(`Rendimento stake obrigatório: ${fiveMinuteYield} DET (calculado: ${calculatedYield})`);
-                this.userData.stakeBalance += fiveMinuteYield;
-                this.userData.dailyYieldObligatoryAccumulated += fiveMinuteYield;
+                let calculatedYield = this.userData.stakeBalance * this.minuteYieldRate;
+                let minuteYield = Math.floor(calculatedYield + this.userData.fractionalYieldObligatory);
+                this.userData.fractionalYieldObligatory = calculatedYield + this.userData.fractionalYieldObligatory - minuteYield;
+                console.log(`Rendimento stake obrigatório: ${minuteYield} DET (calculado: ${calculatedYield}, fractional restante: ${this.userData.fractionalYieldObligatory})`);
+                this.userData.stakeBalance += minuteYield;
+                this.userData.dailyYieldObligatoryAccumulated += calculatedYield;
                 this.saveUserData();
                 this.backupUserData();
                 this.updateUI();
-                if (this.currentPage === 'wallet') {
-                    this.showToast(`+${fiveMinuteYield} DET adicionados ao stake obrigatório!`, 'success');
+                if (this.currentPage === 'wallet' && calculatedYield > 0) {
+                    this.showToast(`+${calculatedYield.toFixed(5)} DET acumulados no stake obrigatório!`, 'success');
                 }
             } else {
                 console.log('Nenhum saldo em stake obrigatório, pulando atualização');
             }
             if (this.userData.voluntaryStakeBalance > 0) {
-                const calculatedYield = this.userData.voluntaryStakeBalance * this.fiveMinuteYieldRate;
-                const fiveMinuteYield = Math.max(1, Math.floor(calculatedYield)); // Garante pelo menos 1 DET
-                console.log(`Rendimento stake voluntário: ${fiveMinuteYield} DET (calculado: ${calculatedYield})`);
-                this.userData.voluntaryStakeBalance += fiveMinuteYield;
-                this.userData.dailyYieldVoluntaryAccumulated += fiveMinuteYield;
+                let calculatedYield = this.userData.voluntaryStakeBalance * this.minuteYieldRate;
+                let minuteYield = Math.floor(calculatedYield + this.userData.fractionalYieldVoluntary);
+                this.userData.fractionalYieldVoluntary = calculatedYield + this.userData.fractionalYieldVoluntary - minuteYield;
+                console.log(`Rendimento stake voluntário: ${minuteYield} DET (calculado: ${calculatedYield}, fractional restante: ${this.userData.fractionalYieldVoluntary})`);
+                this.userData.voluntaryStakeBalance += minuteYield;
+                this.userData.dailyYieldVoluntaryAccumulated += calculatedYield;
                 this.saveUserData();
                 this.backupUserData();
                 this.updateUI();
-                if (this.currentPage === 'wallet') {
-                    this.showToast(`+${fiveMinuteYield} DET adicionados ao stake voluntário!`, 'success');
+                if (this.currentPage === 'wallet' && calculatedYield > 0) {
+                    this.showToast(`+${calculatedYield.toFixed(5)} DET acumulados no stake voluntário!`, 'success');
                 }
             } else {
                 console.log('Nenhum saldo em stake voluntário, pulando atualização');
             }
-        }, 300000); // 5 minutos
+        }, 60000); // 1 minuto
     }
 
     stakeVoluntary() {

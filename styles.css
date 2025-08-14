@@ -209,7 +209,8 @@ body {
     border-radius: 5px;
     font-size: 1rem;
     cursor: pointer;
-    transition: background 0.3s;
+    transition: background 0.3s, transform 0.2s;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
 }
 
 .btn-primary {
@@ -219,6 +220,7 @@ body {
 
 .btn-primary:hover {
     background: #e6c200;
+    transform: translateY(-2px);
 }
 
 .btn-secondary {
@@ -228,6 +230,7 @@ body {
 
 .btn-secondary:hover {
     background: #3a3a5e;
+    transform: translateY(-2px);
 }
 
 .full-width {
@@ -400,7 +403,6 @@ body {
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
-    margin-bottom: 1rem;
 }
 
 .stake-detail {
@@ -633,6 +635,12 @@ body {
     text-align: center;
     flex: 1;
     min-width: 150px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    transition: transform 0.2s;
+}
+
+.stat-card:hover {
+    transform: translateY(-2px);
 }
 
 .stat-card .stat-number {
@@ -707,6 +715,11 @@ body {
 .presale-table td, .vip-table td {
     padding: 0.8rem;
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--text-light);
+}
+
+.presale-table tr:hover, .vip-table tr:hover {
+    background: rgba(255, 255, 255, 0.2);
 }
 
 @media (max-width: 768px) {
@@ -758,8 +771,8 @@ body {
 }
 
 .modal-body {
-    max-height: 80vh;
     overflow-y: auto;
+    max-height: 80vh;
 }
 
 .photo-upload-area {
@@ -782,10 +795,11 @@ body {
 
 #photo-preview img {
     max-width: 100%;
-    height: auto;
-    max-height: 200px; /* Limita a altura para evitar que o preview empurre o botão para fora da tela */
+    max-height: 200px;
     display: block;
     margin: 0 auto;
+    border-radius: 5px;
+    margin-top: 1rem;
 }
 
 /* Loading Overlay */
