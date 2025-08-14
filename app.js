@@ -23,6 +23,7 @@ class DetHabitsApp {
         this.currentPage = 'home';
         this.currentMission = null;
         this.minuteYieldRate = 300 / (365 * 24 * 60) / 100;
+        this.nextMissionReset = null;
     }
 
     async init() {
@@ -96,12 +97,13 @@ class DetHabitsApp {
         }
     }
 
-    selectDailyMissions() {
+    selectDailyMissions(forceReset = false) {
         console.log('Selecionando missões diárias...');
         const today = new Date().toDateString();
 
-        if (this.missions.length === 0 || this.lastMissionResetDate !== today) {
-            console.log('Nenhuma missão carregada ou novo dia detectado, selecionando novas missões');
+        // Forçar reset se forceReset for true ou se as condições de reset forem atendidas
+        if (forceReset || this.missions.length === 0 || this.lastMissionResetDate !== today) {
+            console.log('Forçando reset ou novo dia detectado, selecionando novas missões');
             if (this.allMissions.length === 0) {
                 console.warn('Nenhuma missão disponível em allMissions');
                 this.showToast('Nenhuma missão disponível. Tente novamente mais tarde.', 'error');
@@ -117,8 +119,13 @@ class DetHabitsApp {
             this.userData.dailyMissions = this.missions;
             this.saveUserData();
             this.backupUserData();
-            console.log('Missões diárias selecionadas:', this.missions);
+            console.log('Novas missões diárias selecionadas:', this.missions);
             this.showToast('Novas missões diárias disponíveis!', 'success');
+            // Atualiza o próximo reset para meia-noite do próximo dia
+            this.nextMissionReset = new Date();
+            this.nextMissionReset.setDate(this.nextMissionReset.getDate() + 1);
+            this.nextMissionReset.setHours(0, 0, 0, 0);
+            console.log('Próximo reset de missões:', this.nextMissionReset);
         } else {
             console.log('Missões do dia já carregadas:', this.missions);
         }
@@ -126,21 +133,37 @@ class DetHabitsApp {
 
     startMissionTimer() {
         console.log('Iniciando temporizador de missões');
+        // Garante que nextMissionReset esteja definido
+        if (!this.nextMissionReset) {
+            this.nextMissionReset = new Date();
+            this.nextMissionReset.setDate(this.nextMissionReset.getDate() + 1);
+            this.nextMissionReset.setHours(0, 0, 0, 0);
+            console.log('nextMissionReset inicializado:', this.nextMissionReset);
+        }
+
         const updateTimer = () => {
             const now = new Date();
-            const nextReset = new Date();
-            // Para testes: reset a cada 1 minuto
-            nextReset.setTime(now.getTime() + 60 * 1000); // 60 segundos = 1 minuto
-            // Para produção: reset à meia-noite do próximo dia
-            // nextReset.setDate(now.getDate() + 1);
-            // nextReset.setHours(0, 0, 0, 0);
+            const diff = this.nextMissionReset - now;
+            console.log('Tempo até próximo reset (ms):', diff);
 
-            const diff = nextReset - now;
-            console.log('Tempo até próximo reset (ms):', diff); // Log para depuração
+            if (diff <= 0) {
+                console.log('Resetando missões...');
+                this.lastMissionResetDate = new Date().toDateString();
+                this.selectDailyMissions(true); // Forçar reset das missões
+                this.loadMissions();
+                this.updateMissionProgress();
+                this.nextMissionReset = new Date();
+                this.nextMissionReset.setDate(this.nextMissionReset.getDate() + 1);
+                this.nextMissionReset.setHours(0, 0, 0, 0);
+                console.log('Novo próximo reset:', this.nextMissionReset);
+                this.showToast('Missões resetadas com sucesso!', 'success');
+                return;
+            }
+
             const hours = Math.floor(diff / (1000 * 60 * 60));
             const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
             const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-            console.log(`Tempo formatado: ${hours}:${minutes}:${seconds}`); // Log para depuração
+            console.log(`Tempo formatado: ${hours}:${minutes}:${seconds}`);
 
             const missionTimer = document.getElementById('mission-timer');
             if (missionTimer) {
@@ -150,20 +173,9 @@ class DetHabitsApp {
                 console.error('Elemento mission-timer não encontrado no DOM');
                 this.showToast('Erro: Temporizador de missões não encontrado.', 'error');
             }
-
-            // Verifica se é hora de resetar as missões
-            if (diff <= 1000) {
-                console.log('Resetando missões...');
-                this.lastMissionResetDate = new Date().toDateString();
-                this.selectDailyMissions();
-                this.loadMissions();
-                this.updateMissionProgress();
-            }
         };
 
-        // Executa imediatamente para evitar atraso inicial
         updateTimer();
-        // Configura intervalo para atualização a cada segundo
         const intervalId = setInterval(updateTimer, 1000);
         console.log('setInterval configurado com ID:', intervalId);
     }
@@ -241,9 +253,9 @@ class DetHabitsApp {
         if (copyUrlButton) {
             copyUrlButton.addEventListener('click', () => this.copyAppUrl());
         }
-        const exportDataButton = document.getElementById('export-data-btn');
-        if (exportDataButton) {
-            exportDataButton.addEventListener('click', () => this.exportUserData());
+        const copyPresaleWalletButton = document.getElementById('copy-presale-wallet-btn');
+        if (copyPresaleWalletButton) {
+            copyPresaleWalletButton.addEventListener('click', () => this.copyPresaleWallet());
         }
     }
 
@@ -253,6 +265,15 @@ class DetHabitsApp {
             this.showToast('URL copiada para a área de transferência!', 'success');
         }).catch(() => {
             this.showToast('Erro ao copiar a URL.', 'error');
+        });
+    }
+
+    copyPresaleWallet() {
+        const presaleWallet = document.getElementById('presale-wallet').textContent;
+        navigator.clipboard.writeText(presaleWallet).then(() => {
+            this.showToast('Carteira da pré-venda copiada!', 'success');
+        }).catch(() => {
+            this.showToast('Erro ao copiar a carteira da pré-venda.', 'error');
         });
     }
 
@@ -772,6 +793,7 @@ class DetHabitsApp {
             return;
         }
         console.log('Carregando dados do usuário para carteira:', this.wallet);
+        const today = new Date().toDateString();
         const saved = localStorage.getItem(`dethabits_data_${this.wallet}`);
         let data;
         if (saved) {
@@ -787,23 +809,24 @@ class DetHabitsApp {
                         fractionalYieldVoluntary: Number(data.fractionalYieldVoluntary) || 0,
                         dailyYieldObligatoryAccumulated: Number(data.dailyYieldObligatoryAccumulated) || 0,
                         dailyYieldVoluntaryAccumulated: Number(data.dailyYieldVoluntaryAccumulated) || 0,
-                        lastYieldResetDate: data.lastYieldResetDate || new Date().toDateString(),
+                        lastYieldResetDate: data.lastYieldResetDate || today,
                         completedMissions: data.completedMissions || [],
                         transactions: data.transactions || [],
-                        lastMissionResetDate: data.lastMissionResetDate || new Date().toDateString(),
+                        lastMissionResetDate: data.lastMissionResetDate || today,
                         dailyMissions: data.dailyMissions || []
                     };
-                    if (this.userData.dailyMissions.length > 0 && this.userData.lastMissionResetDate === new Date().toDateString()) {
+                    // Verificar se as missões salvas são do dia atual
+                    if (this.userData.dailyMissions.length > 0 && this.userData.lastMissionResetDate === today) {
                         this.missions = this.userData.dailyMissions;
                         this.lastMissionResetDate = this.userData.lastMissionResetDate;
                         this.missions.forEach(mission => {
                             const completed = this.userData.completedMissions.find(cm => cm.id === mission.id);
-                            mission.completed = completed && new Date(completed.completedAt).toDateString() === new Date().toDateString();
+                            mission.completed = completed && new Date(completed.completedAt).toDateString() === today;
                         });
                     } else {
-                        this.selectDailyMissions();
+                        console.log('Missões salvas desatualizadas, selecionando novas missões');
+                        this.selectDailyMissions(true); // Forçar reset
                     }
-                    const today = new Date().toDateString();
                     if (this.userData.lastYieldResetDate !== today) {
                         this.userData.dailyYieldObligatoryAccumulated = 0;
                         this.userData.dailyYieldVoluntaryAccumulated = 0;
@@ -834,23 +857,23 @@ class DetHabitsApp {
                         fractionalYieldVoluntary: Number(data.fractionalYieldVoluntary) || 0,
                         dailyYieldObligatoryAccumulated: Number(data.dailyYieldObligatoryAccumulated) || 0,
                         dailyYieldVoluntaryAccumulated: Number(data.dailyYieldVoluntaryAccumulated) || 0,
-                        lastYieldResetDate: data.lastYieldResetDate || new Date().toDateString(),
+                        lastYieldResetDate: data.lastYieldResetDate || today,
                         completedMissions: data.completedMissions || [],
                         transactions: data.transactions || [],
-                        lastMissionResetDate: data.lastMissionResetDate || new Date().toDateString(),
+                        lastMissionResetDate: data.lastMissionResetDate || today,
                         dailyMissions: data.dailyMissions || []
                     };
-                    if (this.userData.dailyMissions.length > 0 && this.userData.lastMissionResetDate === new Date().toDateString()) {
+                    if (this.userData.dailyMissions.length > 0 && this.userData.lastMissionResetDate === today) {
                         this.missions = this.userData.dailyMissions;
                         this.lastMissionResetDate = this.userData.lastMissionResetDate;
                         this.missions.forEach(mission => {
                             const completed = this.userData.completedMissions.find(cm => cm.id === mission.id);
-                            mission.completed = completed && new Date(completed.completedAt).toDateString() === new Date().toDateString();
+                            mission.completed = completed && new Date(completed.completedAt).toDateString() === today;
                         });
                     } else {
-                        this.selectDailyMissions();
+                        console.log('Missões de backup desatualizadas, selecionando novas missões');
+                        this.selectDailyMissions(true); // Forçar reset
                     }
-                    const today = new Date().toDateString();
                     if (this.userData.lastYieldResetDate !== today) {
                         this.userData.dailyYieldObligatoryAccumulated = 0;
                         this.userData.dailyYieldVoluntaryAccumulated = 0;
@@ -877,14 +900,14 @@ class DetHabitsApp {
             fractionalYieldVoluntary: 0,
             dailyYieldObligatoryAccumulated: 0,
             dailyYieldVoluntaryAccumulated: 0,
-            lastYieldResetDate: new Date().toDateString(),
+            lastYieldResetDate: today,
             completedMissions: [],
             transactions: [],
-            lastMissionResetDate: new Date().toDateString(),
+            lastMissionResetDate: today,
             dailyMissions: []
         };
         this.missions = [];
-        this.selectDailyMissions();
+        this.selectDailyMissions(true); // Forçar reset inicial
         this.saveUserData();
         this.backupUserData();
         console.log('Dados inicializados com valores padrão');
