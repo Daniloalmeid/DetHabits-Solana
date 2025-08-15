@@ -15,10 +15,12 @@ class DetHabitsApp {
             completedMissions: [],
             transactions: [],
             lastMissionResetDate: new Date().toDateString(),
-            dailyMissions: []
+            dailyMissions: [],
+            fixedMissions: []
         };
-        this.allMissions = [];
-        this.missions = [];
+        this.allMissions = []; // Para missões diárias
+        this.fixedMissions = []; // Para missões fixas
+        this.missions = []; // Missões diárias selecionadas
         this.lastMissionResetDate = new Date().toDateString();
         this.currentPage = 'home';
         this.currentMission = null;
@@ -44,8 +46,11 @@ class DetHabitsApp {
         try {
             const response = await fetch('missions.json');
             if (!response.ok) throw new Error(`Erro HTTP: ${response.status}`);
-            this.allMissions = await response.json();
-            console.log('Missões carregadas com sucesso:', this.allMissions.length);
+            const data = await response.json();
+            this.allMissions = data.dailyMissions || [];
+            this.fixedMissions = data.fixedMissions || [];
+            console.log('Missões diárias carregadas:', this.allMissions.length);
+            console.log('Missões fixas carregadas:', this.fixedMissions.length);
         } catch (error) {
             console.error('Erro ao carregar missões:', error);
             this.showToast('Erro ao carregar missões. Usando lista padrão.', 'error');
@@ -67,33 +72,32 @@ class DetHabitsApp {
                     completed: false
                 },
                 {
-                    id: 'twitter_1',
-                    title: 'Seguir no X (Twitter)',
-                    description: 'Siga nossa conta oficial no X e tire um print da tela.',
-                    icon: '🐦',
-                    reward: 5,
-                    completed: false,
-                    url: 'https://x.com/seuperfil'
-                },
-                {
-                    id: 'instagram_1',
-                    title: 'Seguir no Instagram',
-                    description: 'Siga nosso perfil no Instagram e compartilhe uma foto.',
-                    icon: '📸',
-                    reward: 5,
-                    completed: false,
-                    url: 'https://instagram.com/seuperfil'
-                },
-                {
                     id: 'meditation_1',
                     title: 'Meditar por 3 Minutos',
                     description: 'Dedique 3 minutos para meditação e tire uma selfie relaxante.',
                     icon: '🧘',
                     reward: 5,
                     completed: false
-                }
+                },
+                {
+                    id: 'nap_1',
+                    title: 'Tirar uma Soneca de 15 Minutos',
+                    description: 'Tire uma soneca de 15 minutos e comprove com uma foto do ambiente.',
+                    icon: '😴',
+                    reward: 5,
+                    completed: false
+                },
+                {
+                    id: 'stretch_1',
+                    title: 'Alongar o Corpo por 2 Minutos',
+                    description: 'Faça alongamentos por 2 minutos e envie uma foto ou vídeo.',
+                    icon: '🤸',
+                    reward: 5,
+                    completed: false
+                } 
             ];
-            console.log('Usando missões padrão:', this.allMissions);
+            this.fixedMissions = []; // Não definir missões fixas padrão, depender do missions.json
+            console.log('Usando missões diárias padrão:', this.allMissions);
         }
     }
 
@@ -101,12 +105,11 @@ class DetHabitsApp {
         console.log('Selecionando missões diárias...');
         const today = new Date().toDateString();
 
-        // Forçar reset se forceReset for true ou se as condições de reset forem atendidas
         if (forceReset || this.missions.length === 0 || this.lastMissionResetDate !== today) {
-            console.log('Forçando reset ou novo dia detectado, selecionando novas missões');
+            console.log('Forçando reset ou novo dia detectado, selecionando novas missões diárias');
             if (this.allMissions.length === 0) {
-                console.warn('Nenhuma missão disponível em allMissions');
-                this.showToast('Nenhuma missão disponível. Tente novamente mais tarde.', 'error');
+                console.warn('Nenhuma missão diária disponível em allMissions');
+                this.showToast('Nenhuma missão diária disponível. Tente novamente mais tarde.', 'error');
                 return;
             }
             const shuffledMissions = [...this.allMissions].sort(() => Math.random() - 0.5);
@@ -115,25 +118,25 @@ class DetHabitsApp {
                 completed: false
             }));
             this.lastMissionResetDate = today;
-            this.userData.completedMissions = [];
+            this.userData.completedMissions = this.userData.completedMissions.filter(cm => 
+                this.fixedMissions.some(fm => fm.id === cm.id)
+            ); // Preserva apenas missões fixas concluídas
             this.userData.dailyMissions = this.missions;
             this.saveUserData();
             this.backupUserData();
             console.log('Novas missões diárias selecionadas:', this.missions);
             this.showToast('Novas missões diárias disponíveis!', 'success');
-            // Atualiza o próximo reset para meia-noite do próximo dia
             this.nextMissionReset = new Date();
             this.nextMissionReset.setDate(this.nextMissionReset.getDate() + 1);
             this.nextMissionReset.setHours(0, 0, 0, 0);
             console.log('Próximo reset de missões:', this.nextMissionReset);
         } else {
-            console.log('Missões do dia já carregadas:', this.missions);
+            console.log('Missões diárias do dia já carregadas:', this.missions);
         }
     }
 
     startMissionTimer() {
         console.log('Iniciando temporizador de missões');
-        // Garante que nextMissionReset esteja definido
         if (!this.nextMissionReset) {
             this.nextMissionReset = new Date();
             this.nextMissionReset.setDate(this.nextMissionReset.getDate() + 1);
@@ -147,16 +150,16 @@ class DetHabitsApp {
             console.log('Tempo até próximo reset (ms):', diff);
 
             if (diff <= 0) {
-                console.log('Resetando missões...');
+                console.log('Resetando missões diárias...');
                 this.lastMissionResetDate = new Date().toDateString();
-                this.selectDailyMissions(true); // Forçar reset das missões
+                this.selectDailyMissions(true);
                 this.loadMissions();
                 this.updateMissionProgress();
                 this.nextMissionReset = new Date();
                 this.nextMissionReset.setDate(this.nextMissionReset.getDate() + 1);
                 this.nextMissionReset.setHours(0, 0, 0, 0);
                 console.log('Novo próximo reset:', this.nextMissionReset);
-                this.showToast('Missões resetadas com sucesso!', 'success');
+                this.showToast('Missões diárias resetadas com sucesso!', 'success');
                 return;
             }
 
@@ -388,6 +391,7 @@ class DetHabitsApp {
 
     loadMissions() {
         console.log('Carregando missões para exibição...');
+        // Carregar missões diárias
         const missionsGrid = document.getElementById('missions-grid');
         if (!missionsGrid) {
             console.error('Elemento missions-grid não encontrado no DOM');
@@ -396,17 +400,37 @@ class DetHabitsApp {
         }
         missionsGrid.innerHTML = '';
         if (this.missions.length === 0) {
-            console.warn('Nenhuma missão disponível para exibir');
-            missionsGrid.innerHTML = '<p style="text-align: center; color: var(--gray-500); padding: 2rem;">Nenhuma missão disponível</p>';
-            this.showToast('Nenhuma missão disponível. Tente novamente.', 'error');
+            console.warn('Nenhuma missão diária disponível para exibir');
+            missionsGrid.innerHTML = '<p style="text-align: center; color: var(--gray-500); padding: 2rem;">Nenhuma missão diária disponível</p>';
+        } else {
+            this.missions.forEach(mission => {
+                const missionCard = this.createMissionCard(mission);
+                missionsGrid.appendChild(missionCard);
+            });
+        }
+
+        // Carregar missões fixas
+        const fixedMissionsGrid = document.getElementById('fixed-missions-grid');
+        if (!fixedMissionsGrid) {
+            console.error('Elemento fixed-missions-grid não encontrado no DOM');
+            this.showToast('Erro ao carregar missões fixas: elemento fixed-missions-grid não encontrado.', 'error');
             return;
         }
-        this.missions.forEach(mission => {
-            const missionCard = this.createMissionCard(mission);
-            missionsGrid.appendChild(missionCard);
-        });
+        fixedMissionsGrid.innerHTML = '';
+        if (this.fixedMissions.length === 0) {
+            console.warn('Nenhuma missão fixa disponível para exibir');
+            fixedMissionsGrid.innerHTML = '<p style="text-align: center; color: var(--gray-500); padding: 2rem;">Nenhuma missão fixa disponível</p>';
+        } else {
+            this.fixedMissions.forEach(mission => {
+                const completed = this.userData.completedMissions.find(cm => cm.id === mission.id);
+                mission.completed = !!completed;
+                const missionCard = this.createMissionCard(mission);
+                fixedMissionsGrid.appendChild(missionCard);
+            });
+        }
+
         this.updateMissionProgress();
-        console.log('Missões exibidas:', this.missions);
+        console.log('Missões exibidas:', { daily: this.missions, fixed: this.fixedMissions });
     }
 
     createMissionCard(mission) {
@@ -436,7 +460,8 @@ class DetHabitsApp {
 
     openPhotoModal(missionId) {
         console.log('Abrindo modal de foto para missão:', missionId);
-        this.currentMission = this.missions.find(m => m.id === missionId);
+        this.currentMission = this.missions.find(m => m.id === missionId) || 
+                            this.fixedMissions.find(m => m.id === missionId);
         if (!this.currentMission || this.currentMission.completed) {
             console.warn('Missão não encontrada ou já completada');
             return;
@@ -534,7 +559,7 @@ class DetHabitsApp {
         const completedToday = this.missions.filter(m => m.completed).length;
         if (completedToday === this.missions.length) {
             setTimeout(() => {
-                this.showToast('🎉 Parabéns! Todas as missões do dia foram concluídas!', 'success');
+                this.showToast('🎉 Parabéns! Todas as missões diárias foram concluídas!', 'success');
             }, 1000);
         }
     }
@@ -783,7 +808,8 @@ class DetHabitsApp {
             Array.isArray(data.completedMissions) &&
             Array.isArray(data.transactions) &&
             (typeof data.lastMissionResetDate === 'string' || data.lastMissionResetDate === undefined) &&
-            (Array.isArray(data.dailyMissions) || data.dailyMissions === undefined)
+            (Array.isArray(data.dailyMissions) || data.dailyMissions === undefined) &&
+            (Array.isArray(data.fixedMissions) || data.fixedMissions === undefined)
         );
     }
 
@@ -813,9 +839,9 @@ class DetHabitsApp {
                         completedMissions: data.completedMissions || [],
                         transactions: data.transactions || [],
                         lastMissionResetDate: data.lastMissionResetDate || today,
-                        dailyMissions: data.dailyMissions || []
+                        dailyMissions: data.dailyMissions || [],
+                        fixedMissions: data.fixedMissions || []
                     };
-                    // Verificar se as missões salvas são do dia atual
                     if (this.userData.dailyMissions.length > 0 && this.userData.lastMissionResetDate === today) {
                         this.missions = this.userData.dailyMissions;
                         this.lastMissionResetDate = this.userData.lastMissionResetDate;
@@ -824,8 +850,15 @@ class DetHabitsApp {
                             mission.completed = completed && new Date(completed.completedAt).toDateString() === today;
                         });
                     } else {
-                        console.log('Missões salvas desatualizadas, selecionando novas missões');
-                        this.selectDailyMissions(true); // Forçar reset
+                        console.log('Missões diárias salvas desatualizadas, selecionando novas missões');
+                        this.selectDailyMissions(true);
+                    }
+                    if (this.userData.fixedMissions.length > 0) {
+                        this.fixedMissions = this.userData.fixedMissions;
+                        this.fixedMissions.forEach(mission => {
+                            const completed = this.userData.completedMissions.find(cm => cm.id === mission.id);
+                            mission.completed = !!completed;
+                        });
                     }
                     if (this.userData.lastYieldResetDate !== today) {
                         this.userData.dailyYieldObligatoryAccumulated = 0;
@@ -861,7 +894,8 @@ class DetHabitsApp {
                         completedMissions: data.completedMissions || [],
                         transactions: data.transactions || [],
                         lastMissionResetDate: data.lastMissionResetDate || today,
-                        dailyMissions: data.dailyMissions || []
+                        dailyMissions: data.dailyMissions || [],
+                        fixedMissions: data.fixedMissions || []
                     };
                     if (this.userData.dailyMissions.length > 0 && this.userData.lastMissionResetDate === today) {
                         this.missions = this.userData.dailyMissions;
@@ -871,8 +905,15 @@ class DetHabitsApp {
                             mission.completed = completed && new Date(completed.completedAt).toDateString() === today;
                         });
                     } else {
-                        console.log('Missões de backup desatualizadas, selecionando novas missões');
-                        this.selectDailyMissions(true); // Forçar reset
+                        console.log('Missões diárias de backup desatualizadas, selecionando novas missões');
+                        this.selectDailyMissions(true);
+                    }
+                    if (this.userData.fixedMissions.length > 0) {
+                        this.fixedMissions = this.userData.fixedMissions;
+                        this.fixedMissions.forEach(mission => {
+                            const completed = this.userData.completedMissions.find(cm => cm.id === mission.id);
+                            mission.completed = !!completed;
+                        });
                     }
                     if (this.userData.lastYieldResetDate !== today) {
                         this.userData.dailyYieldObligatoryAccumulated = 0;
@@ -904,10 +945,12 @@ class DetHabitsApp {
             completedMissions: [],
             transactions: [],
             lastMissionResetDate: today,
-            dailyMissions: []
+            dailyMissions: [],
+            fixedMissions: []
         };
         this.missions = [];
-        this.selectDailyMissions(true); // Forçar reset inicial
+        this.fixedMissions = [];
+        this.selectDailyMissions(true);
         this.saveUserData();
         this.backupUserData();
         console.log('Dados inicializados com valores padrão');
@@ -923,7 +966,8 @@ class DetHabitsApp {
             const data = {
                 ...this.userData,
                 lastMissionResetDate: this.lastMissionResetDate,
-                dailyMissions: this.missions
+                dailyMissions: this.missions,
+                fixedMissions: this.fixedMissions
             };
             if (this.validateUserData(data)) {
                 localStorage.setItem(`dethabits_data_${this.wallet}`, JSON.stringify(data));
@@ -1008,7 +1052,8 @@ class DetHabitsApp {
                         completedMissions: data.completedMissions || [],
                         transactions: data.transactions || [],
                         lastMissionResetDate: data.lastMissionResetDate || new Date().toDateString(),
-                        dailyMissions: data.dailyMissions || []
+                        dailyMissions: data.dailyMissions || [],
+                        fixedMissions: data.fixedMissions || []
                     };
                     this.saveUserData();
                     this.backupUserData();
