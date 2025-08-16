@@ -1,3 +1,6 @@
+// app.js
+import { StakingManager } from './staking.js';
+
 // DetHabits Application
 class DetHabitsApp {
     constructor() {
@@ -18,14 +21,22 @@ class DetHabitsApp {
             dailyMissions: [],
             fixedMissions: []
         };
-        this.allMissions = []; // Para missões diárias
-        this.fixedMissions = []; // Para missões fixas
-        this.missions = []; // Missões diárias selecionadas
+        this.allMissions = [];
+        this.fixedMissions = [];
+        this.missions = [];
         this.lastMissionResetDate = new Date().toDateString();
         this.currentPage = 'home';
         this.currentMission = null;
         this.minuteYieldRate = 300 / (365 * 24 * 60) / 100;
         this.nextMissionReset = null;
+        this.stakingManager = new StakingManager(
+            this.userData,
+            this.minuteYieldRate,
+            () => this.saveUserData(),
+            () => this.backupUserData(),
+            () => this.updateUI(),
+            (message, type) => this.showToast(message, type)
+        );
     }
 
     async init() {
@@ -37,7 +48,7 @@ class DetHabitsApp {
         this.updateUI();
         this.startMissionTimer();
         this.loadMissions();
-        this.startYieldUpdater();
+        this.stakingManager.startYieldUpdater();
         this.startBackupInterval();
     }
 
@@ -94,9 +105,9 @@ class DetHabitsApp {
                     icon: '🤸',
                     reward: 5,
                     completed: false
-                } 
+                }
             ];
-            this.fixedMissions = []; // Não definir missões fixas padrão, depender do missions.json
+            this.fixedMissions = [];
             console.log('Usando missões diárias padrão:', this.allMissions);
         }
     }
@@ -118,9 +129,9 @@ class DetHabitsApp {
                 completed: false
             }));
             this.lastMissionResetDate = today;
-            this.userData.completedMissions = this.userData.completedMissions.filter(cm => 
+            this.userData.completedMissions = this.userData.completedMissions.filter(cm =>
                 this.fixedMissions.some(fm => fm.id === cm.id)
-            ); // Preserva apenas missões fixas concluídas
+            );
             this.userData.dailyMissions = this.missions;
             this.saveUserData();
             this.backupUserData();
@@ -170,7 +181,7 @@ class DetHabitsApp {
 
             const missionTimer = document.getElementById('mission-timer');
             if (missionTimer) {
-                missionTimer.textContent = 
+                missionTimer.textContent =
                     `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
             } else {
                 console.error('Elemento mission-timer não encontrado no DOM');
@@ -188,8 +199,6 @@ class DetHabitsApp {
         const connectButton = document.getElementById('connect-wallet-btn');
         if (connectButton) {
             connectButton.addEventListener('click', () => this.connectWallet());
-        } else {
-            console.error('Botão de conexão não encontrado');
         }
         document.querySelectorAll('.nav-button').forEach(btn => {
             btn.addEventListener('click', (e) => this.navigateTo(e.target.dataset.page));
@@ -251,6 +260,14 @@ class DetHabitsApp {
         const unstakeVoluntaryButton = document.getElementById('unstake-voluntary-btn');
         if (unstakeVoluntaryButton) {
             unstakeVoluntaryButton.addEventListener('click', () => this.unstakeVoluntary());
+        }
+        const withdrawMaxObligatoryButton = document.getElementById('withdraw-max-obligatory-btn');
+        if (withdrawMaxObligatoryButton) {
+            withdrawMaxObligatoryButton.addEventListener('click', () => this.withdrawMaxObligatory());
+        }
+        const withdrawMaxVoluntaryButton = document.getElementById('withdraw-max-voluntary-btn');
+        if (withdrawMaxVoluntaryButton) {
+            withdrawMaxVoluntaryButton.addEventListener('click', () => this.withdrawMaxVoluntary());
         }
         const copyUrlButton = document.getElementById('copy-url-btn');
         if (copyUrlButton) {
@@ -348,7 +365,7 @@ class DetHabitsApp {
         document.getElementById('navbar').style.display = 'block';
         const walletAddressElement = document.getElementById('wallet-address');
         if (walletAddressElement) {
-            walletAddressElement.textContent = 
+            walletAddressElement.textContent =
                 `${this.wallet.substring(0, 4)}...${this.wallet.substring(this.wallet.length - 4)}`;
         } else {
             console.error('Elemento wallet-address não encontrado');
@@ -391,7 +408,6 @@ class DetHabitsApp {
 
     loadMissions() {
         console.log('Carregando missões para exibição...');
-        // Carregar missões diárias
         const missionsGrid = document.getElementById('missions-grid');
         if (!missionsGrid) {
             console.error('Elemento missions-grid não encontrado no DOM');
@@ -409,7 +425,6 @@ class DetHabitsApp {
             });
         }
 
-        // Carregar missões fixas
         const fixedMissionsGrid = document.getElementById('fixed-missions-grid');
         if (!fixedMissionsGrid) {
             console.error('Elemento fixed-missions-grid não encontrado no DOM');
@@ -460,7 +475,7 @@ class DetHabitsApp {
 
     openPhotoModal(missionId) {
         console.log('Abrindo modal de foto para missão:', missionId);
-        this.currentMission = this.missions.find(m => m.id === missionId) || 
+        this.currentMission = this.missions.find(m => m.id === missionId) ||
                             this.fixedMissions.find(m => m.id === missionId);
         if (!this.currentMission || this.currentMission.completed) {
             console.warn('Missão não encontrada ou já completada');
@@ -612,11 +627,29 @@ class DetHabitsApp {
         }
         const dailyYieldElement = document.getElementById('daily-yield');
         if (dailyYieldElement) {
-            dailyYieldElement.textContent = `+${this.userData.dailyYieldObligatoryAccumulated.toFixed(5)}`;
+            const totalObligatoryYield = (this.userData.dailyYieldObligatoryAccumulated + this.userData.fractionalYieldObligatory).toFixed(5);
+            dailyYieldElement.textContent = `+${totalObligatoryYield} DET`;
+        }
+        const voluntaryYieldElement = document.getElementById('voluntary-yield');
+        if (voluntaryYieldElement) {
+            voluntaryYieldElement.textContent = `${(this.userData.dailyYieldVoluntaryAccumulated + this.userData.fractionalYieldVoluntary).toFixed(5)} DET (Rendimento)`;
+        }
+        const dailyYieldVoluntaryElement = document.getElementById('daily-yield-voluntary');
+        if (dailyYieldVoluntaryElement) {
+            const totalVoluntaryYield = (this.userData.dailyYieldVoluntaryAccumulated + this.userData.fractionalYieldVoluntary).toFixed(5);
+            dailyYieldVoluntaryElement.textContent = `+${totalVoluntaryYield} DET`;
         }
         const withdrawBtn = document.getElementById('withdraw-btn');
         if (withdrawBtn) {
             withdrawBtn.disabled = this.userData.totalBalance < 800;
+        }
+        const withdrawMaxObligatoryButton = document.getElementById('withdraw-max-obligatory-btn');
+        if (withdrawMaxObligatoryButton) {
+            withdrawMaxObligatoryButton.disabled = this.userData.stakeBalance <= 0;
+        }
+        const withdrawMaxVoluntaryButton = document.getElementById('withdraw-max-voluntary-btn');
+        if (withdrawMaxVoluntaryButton) {
+            withdrawMaxVoluntaryButton.disabled = this.userData.voluntaryStakeBalance <= 0;
         }
         this.loadTransactionHistory();
     }
@@ -661,9 +694,9 @@ class DetHabitsApp {
             const item = document.createElement('div');
             item.className = 'transaction-item';
             const date = new Date(transaction.timestamp).toLocaleDateString('pt-BR');
-            const time = new Date(transaction.timestamp).toLocaleTimeString('pt-BR', { 
-                hour: '2-digit', 
-                minute: '2-digit' 
+            const time = new Date(transaction.timestamp).toLocaleTimeString('pt-BR', {
+                hour: '2-digit',
+                minute: '2-digit'
             });
             item.innerHTML = `
                 <div class="transaction-info">
@@ -860,13 +893,7 @@ class DetHabitsApp {
                             mission.completed = !!completed;
                         });
                     }
-                    if (this.userData.lastYieldResetDate !== today) {
-                        this.userData.dailyYieldObligatoryAccumulated = 0;
-                        this.userData.dailyYieldVoluntaryAccumulated = 0;
-                        this.userData.lastYieldResetDate = today;
-                        this.saveUserData();
-                        this.backupUserData();
-                    }
+                    this.stakingManager.resetDailyYields();
                     console.log('Dados carregados com sucesso');
                     return;
                 } else {
@@ -915,13 +942,7 @@ class DetHabitsApp {
                             mission.completed = !!completed;
                         });
                     }
-                    if (this.userData.lastYieldResetDate !== today) {
-                        this.userData.dailyYieldObligatoryAccumulated = 0;
-                        this.userData.dailyYieldVoluntaryAccumulated = 0;
-                        this.userData.lastYieldResetDate = today;
-                        this.saveUserData();
-                        this.backupUserData();
-                    }
+                    this.stakingManager.resetDailyYields();
                     console.log('Dados restaurados do backup com sucesso');
                     this.saveUserData();
                     return;
@@ -1007,156 +1028,47 @@ class DetHabitsApp {
         }, 60000);
     }
 
-    exportUserData() {
-        if (!this.wallet) {
-            this.showToast('Conecte sua carteira primeiro.', 'error');
-            return;
-        }
-        try {
-            const dataStr = JSON.stringify(this.userData);
-            const blob = new Blob([dataStr], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `dethabits_data_${this.wallet}.json`;
-            link.click();
-            URL.revokeObjectURL(url);
-            this.showToast('Dados exportados com sucesso!', 'success');
-        } catch (error) {
-            console.error('Erro ao exportar dados:', error);
-            this.showToast('Erro ao exportar dados.', 'error');
-        }
-    }
-
-    importUserData(event) {
-        const file = event.target.files[0];
-        if (!file) {
-            this.showToast('Nenhum arquivo selecionado.', 'error');
-            return;
-        }
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            try {
-                const data = JSON.parse(e.target.result);
-                if (this.validateUserData(data)) {
-                    this.userData = {
-                        totalBalance: Number(data.totalBalance) || 0,
-                        stakeBalance: Number(data.stakeBalance) || 0,
-                        spendingBalance: Number(data.spendingBalance) || 0,
-                        voluntaryStakeBalance: Number(data.voluntaryStakeBalance) || 0,
-                        fractionalYieldObligatory: Number(data.fractionalYieldObligatory) || 0,
-                        fractionalYieldVoluntary: Number(data.fractionalYieldVoluntary) || 0,
-                        dailyYieldObligatoryAccumulated: Number(data.dailyYieldObligatoryAccumulated) || 0,
-                        dailyYieldVoluntaryAccumulated: Number(data.dailyYieldVoluntaryAccumulated) || 0,
-                        lastYieldResetDate: data.lastYieldResetDate || new Date().toDateString(),
-                        completedMissions: data.completedMissions || [],
-                        transactions: data.transactions || [],
-                        lastMissionResetDate: data.lastMissionResetDate || new Date().toDateString(),
-                        dailyMissions: data.dailyMissions || [],
-                        fixedMissions: data.fixedMissions || []
-                    };
-                    this.saveUserData();
-                    this.backupUserData();
-                    this.updateUI();
-                    this.showToast('Dados importados com sucesso!', 'success');
-                } else {
-                    this.showToast('Arquivo de dados inválido.', 'error');
-                }
-            } catch (error) {
-                console.error('Erro ao importar dados:', error);
-                this.showToast('Erro ao importar dados.', 'error');
-            }
-        };
-        reader.readAsText(file);
-    }
-
-    updateUI() {
-        console.log('Atualizando UI geral');
-        if (this.wallet) {
-            this.updateWalletDisplay();
-        }
-        if (this.currentPage === 'wallet') {
-            this.updateWalletPage();
-        }
-        if (this.currentPage === 'shop') {
-            this.updateShopPage();
-        }
-        if (this.currentPage === 'missions') {
-            this.updateMissionsPage();
-        }
-    }
-
-    startYieldUpdater() {
-        console.log('Iniciando atualizador de rendimento a cada minuto');
-        setInterval(() => {
-            console.log('Verificando rendimentos...');
-            if (this.userData.stakeBalance > 0) {
-                let calculatedYield = this.userData.stakeBalance * this.minuteYieldRate;
-                let minuteYield = Math.floor(calculatedYield + this.userData.fractionalYieldObligatory);
-                this.userData.fractionalYieldObligatory = calculatedYield + this.userData.fractionalYieldObligatory - minuteYield;
-                console.log(`Rendimento stake obrigatório: ${minuteYield} DET (calculado: ${calculatedYield}, fractional restante: ${this.userData.fractionalYieldObligatory})`);
-                this.userData.stakeBalance += minuteYield;
-                this.userData.dailyYieldObligatoryAccumulated += calculatedYield;
-                this.saveUserData();
-                this.backupUserData();
-                this.updateUI();
-                if (this.currentPage === 'wallet' && calculatedYield > 0) {
-                    this.showToast(`+${calculatedYield.toFixed(5)} DET acumulados no stake obrigatório!`, 'success');
-                }
-            } else {
-                console.log('Nenhum saldo em stake obrigatório, pulando atualização');
-            }
-            if (this.userData.voluntaryStakeBalance > 0) {
-                let calculatedYield = this.userData.voluntaryStakeBalance * this.minuteYieldRate;
-                let minuteYield = Math.floor(calculatedYield + this.userData.fractionalYieldVoluntary);
-                this.userData.fractionalYieldVoluntary = calculatedYield + this.userData.fractionalYieldVoluntary - minuteYield;
-                console.log(`Rendimento stake voluntário: ${minuteYield} DET (calculado: ${calculatedYield}, fractional restante: ${this.userData.fractionalYieldVoluntary})`);
-                this.userData.voluntaryStakeBalance += minuteYield;
-                this.userData.dailyYieldVoluntaryAccumulated += calculatedYield;
-                this.saveUserData();
-                this.backupUserData();
-                this.updateUI();
-                if (this.currentPage === 'wallet' && calculatedYield > 0) {
-                    this.showToast(`+${calculatedYield.toFixed(5)} DET acumulados no stake voluntário!`, 'success');
-                }
-            } else {
-                console.log('Nenhum saldo em stake voluntário, pulando atualização');
-            }
-        }, 60000);
-    }
-
     stakeVoluntary() {
         console.log('Realizando stake voluntário');
         const amountInput = document.getElementById('stake-amount-input');
         const amount = parseInt(amountInput.value);
-        if (isNaN(amount) || amount <= 0 || amount > this.userData.totalBalance) {
-            this.showToast('Quantidade inválida ou saldo insuficiente.', 'error');
-            return;
+        try {
+            this.stakingManager.stakeVoluntary(amount);
+            amountInput.value = '';
+            this.showToast(`Stake voluntário de ${amount} DET realizado com sucesso!`, 'success');
+        } catch (error) {
+            this.showToast(error.message, 'error');
         }
-        this.userData.totalBalance -= amount;
-        this.userData.voluntaryStakeBalance += amount;
-        this.addTransaction('stake', `Stake voluntário de ${amount} DET`, -amount);
-        this.saveUserData();
-        this.backupUserData();
-        this.updateWalletPage();
-        amountInput.value = '';
-        this.showToast(`Stake voluntário de ${amount} DET realizado com sucesso!`, 'success');
     }
 
     unstakeVoluntary() {
         console.log('Retirando stake voluntário');
-        if (this.userData.voluntaryStakeBalance <= 0) {
-            this.showToast('Nenhum valor em stake voluntário para retirar.', 'error');
-            return;
+        try {
+            const amount = this.stakingManager.unstakeVoluntary();
+            this.showToast(`Retirada de ${amount} DET do stake voluntário realizada com sucesso!`, 'success');
+        } catch (error) {
+            this.showToast(error.message, 'error');
         }
-        const amount = this.userData.voluntaryStakeBalance;
-        this.userData.voluntaryStakeBalance = 0;
-        this.userData.totalBalance += amount;
-        this.addTransaction('unstake', `Retirada de stake voluntário de ${amount} DET`, amount);
-        this.saveUserData();
-        this.backupUserData();
-        this.updateWalletPage();
-        this.showToast(`Retirada de ${amount} DET do stake voluntário realizada com sucesso!`, 'success');
+    }
+
+    withdrawMaxObligatory() {
+        console.log('Retirando máximo do stake obrigatório');
+        try {
+            const amount = this.stakingManager.withdrawMaxObligatory();
+            this.showToast(`Retirada de ${amount} DET do stake obrigatório realizada com sucesso!`, 'success');
+        } catch (error) {
+            this.showToast(error.message, 'error');
+        }
+    }
+
+    withdrawMaxVoluntary() {
+        console.log('Retirando máximo do stake voluntário');
+        try {
+            const amount = this.stakingManager.withdrawMaxVoluntary();
+            this.showToast(`Retirada de ${amount} DET do stake voluntário realizada com sucesso!`, 'success');
+        } catch (error) {
+            this.showToast(error.message, 'error');
+        }
     }
 
     async withdrawToSolana() {
@@ -1218,6 +1130,22 @@ class DetHabitsApp {
             this.showToast('Erro ao realizar a retirada. Tente novamente.', 'error');
         } finally {
             this.hideLoading();
+        }
+    }
+
+    updateUI() {
+        console.log('Atualizando UI geral');
+        if (this.wallet) {
+            this.updateWalletDisplay();
+        }
+        if (this.currentPage === 'wallet') {
+            this.updateWalletPage();
+        }
+        if (this.currentPage === 'shop') {
+            this.updateShopPage();
+        }
+        if (this.currentPage === 'missions') {
+            this.updateMissionsPage();
         }
     }
 }

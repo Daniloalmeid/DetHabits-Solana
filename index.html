@@ -7,7 +7,8 @@
     <link rel="stylesheet" href="styles.css">
     <script src="https://unpkg.com/@solana/web3.js@1.95.3/dist/index.iife.min.js"></script>
     <script src="https://unpkg.com/@solana/spl-token@0.4.8/dist/index.iife.min.js"></script>
-    <script src="app.js" defer></script>
+    <script type="module" src="staking.js"></script>
+    <script type="module" src="app.js" defer></script>
 </head>
 <body>
     <nav id="navbar" class="navbar" style="display: none;">
@@ -120,9 +121,14 @@
                             <span id="stake-time-left">90 dias</span>
                         </div>
                         <div class="stake-detail">
-                            <span>Rendimento diário:</span>
-                            <span id="daily-yield">+0</span>
+                            <span>Rendimento:</span>
+                            <span id="daily-yield">+0 DET</span>
                         </div>
+                    </div>
+                    <div class="stake-input">
+                        <input type="number" id="withdraw-obligatory-amount" placeholder="Quantidade para sacar" min="1">
+                        <button id="withdraw-obligatory-btn" class="btn-secondary">Sacar</button>
+                        <button id="withdraw-max-obligatory-btn" class="btn-secondary full-width">Sacar Máximo</button>
                     </div>
                 </div>
                 <div class="wallet-card stake-voluntary">
@@ -131,20 +137,21 @@
                         <div class="stake-info">300% ao ano</div>
                     </div>
                     <div class="balance-amount" id="voluntary-stake-balance">0</div>
-                    <div class="yield-amount" id="voluntary-yield">0 DET (Rendimento)</div>
                     <div class="stake-details">
                         <div class="stake-detail">
-                            <span>Rendimento diário:</span>
-                            <span id="daily-yield">+0</span>
+                            <span>Rendimento:</span>
+                            <span id="daily-yield-voluntary">+0 DET</span>
                         </div>
                     </div>
                     <div class="stake-input">
                         <input type="number" id="stake-amount-input" placeholder="Quantidade DET para stake" min="1">
                         <button id="stake-voluntary-btn" class="btn-primary">Stake</button>
                         <button id="unstake-voluntary-btn" class="btn-secondary">Retirar Stake</button>
+                        <button id="withdraw-max-voluntary-btn" class="btn-secondary full-width">Sacar Máximo</button>
                     </div>
                 </div>
                 <div class="wallet-card spending-balance">
+                    <div class="banner-image"></div>
                     <div class="card-header">
                         <h3>Saldo para Compras</h3>
                         <div class="spending-info">10% das missões</div>
