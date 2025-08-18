@@ -1,9 +1,9 @@
-// app.js
 import { StakingManager } from './staking.js';
 
 // DetHabits Application
 class DetHabitsApp {
     constructor() {
+        console.log('Construindo DetHabitsApp...');
         this.wallet = null;
         this.userData = {
             totalBalance: 0,
@@ -29,14 +29,19 @@ class DetHabitsApp {
         this.currentMission = null;
         this.minuteYieldRate = 300 / (365 * 24 * 60) / 100;
         this.nextMissionReset = null;
-        this.stakingManager = new StakingManager(
-            this.userData,
-            this.minuteYieldRate,
-            () => this.saveUserData(),
-            () => this.backupUserData(),
-            () => this.updateUI(),
-            (message, type) => this.showToast(message, type)
-        );
+        try {
+            this.stakingManager = new StakingManager(
+                this.userData,
+                this.minuteYieldRate,
+                () => this.saveUserData(),
+                () => this.backupUserData(),
+                () => this.updateUI(),
+                (message, type) => this.showToast(message, type)
+            );
+        } catch (error) {
+            console.error('Erro ao inicializar StakingManager:', error);
+            this.showToast('Erro ao inicializar o sistema de staking. Algumas funcionalidades podem estar indisponíveis.', 'error');
+        }
     }
 
     async init() {
@@ -48,7 +53,9 @@ class DetHabitsApp {
         this.updateUI();
         this.startMissionTimer();
         this.loadMissions();
-        this.stakingManager.startYieldUpdater();
+        if (this.stakingManager) {
+            this.stakingManager.startYieldUpdater();
+        }
         this.startBackupInterval();
     }
 
@@ -535,7 +542,7 @@ class DetHabitsApp {
         reader.onload = (e) => {
             const photoPreview = document.getElementById('photo-preview');
             if (photoPreview) {
-                photoPreview.innerHTML = `<img src="${e.target.result}" alt="Preview da missão">`;
+                photoPreview.innerHTML = `<img src="${e.target.result}" alt="Preview da missão" style="max-width: 200px; max-height: 200px;">`;
             }
             const submitMissionButton = document.getElementById('submit-mission-btn');
             if (submitMissionButton) {
@@ -630,10 +637,6 @@ class DetHabitsApp {
             const totalObligatoryYield = (this.userData.dailyYieldObligatoryAccumulated + this.userData.fractionalYieldObligatory).toFixed(5);
             dailyYieldElement.textContent = `+${totalObligatoryYield} DET`;
         }
-        const voluntaryYieldElement = document.getElementById('voluntary-yield');
-        if (voluntaryYieldElement) {
-            voluntaryYieldElement.textContent = `${(this.userData.dailyYieldVoluntaryAccumulated + this.userData.fractionalYieldVoluntary).toFixed(5)} DET (Rendimento)`;
-        }
         const dailyYieldVoluntaryElement = document.getElementById('daily-yield-voluntary');
         if (dailyYieldVoluntaryElement) {
             const totalVoluntaryYield = (this.userData.dailyYieldVoluntaryAccumulated + this.userData.fractionalYieldVoluntary).toFixed(5);
@@ -701,7 +704,7 @@ class DetHabitsApp {
             item.innerHTML = `
                 <div class="transaction-info">
                     <div class="transaction-icon ${transaction.type}">
-                        ${transaction.type === 'mission' ? '🎯' : transaction.type === 'stake' || transaction.type === 'unstake' ? '🏦' : transaction.type === 'yield' ? '💸' : transaction.type === 'withdraw' ? '↗️' : transaction.type === 'presale' ? '💰' : '🛍️'}
+                        ${transaction.type === 'mission' ? '🎯' : transaction.type === 'stake' ? '🏦' : transaction.type === 'unstake' ? '🏦' : transaction.type === 'yield' ? '💸' : transaction.type === 'withdraw' ? '↗️' : transaction.type === 'presale' ? '💰' : '🛍️'}
                     </div>
                     <div class="transaction-details">
                         <h4>${transaction.description}</h4>
@@ -893,7 +896,9 @@ class DetHabitsApp {
                             mission.completed = !!completed;
                         });
                     }
-                    this.stakingManager.resetDailyYields();
+                    if (this.stakingManager) {
+                        this.stakingManager.resetDailyYields();
+                    }
                     console.log('Dados carregados com sucesso');
                     return;
                 } else {
@@ -942,7 +947,9 @@ class DetHabitsApp {
                             mission.completed = !!completed;
                         });
                     }
-                    this.stakingManager.resetDailyYields();
+                    if (this.stakingManager) {
+                        this.stakingManager.resetDailyYields();
+                    }
                     console.log('Dados restaurados do backup com sucesso');
                     this.saveUserData();
                     return;
@@ -954,7 +961,7 @@ class DetHabitsApp {
             }
         }
         this.userData = {
-            totalBalance: 0,
+            totalBalance: 26, // Definindo saldo inicial como 26 DET conforme informado
             stakeBalance: 0,
             spendingBalance: 0,
             voluntaryStakeBalance: 0,
@@ -1033,10 +1040,16 @@ class DetHabitsApp {
         const amountInput = document.getElementById('stake-amount-input');
         const amount = parseInt(amountInput.value);
         try {
+            if (!this.stakingManager) {
+                throw new Error('Sistema de staking não inicializado.');
+            }
             this.stakingManager.stakeVoluntary(amount);
+            this.addTransaction('stake', `Stake Voluntário: ${amount} DET`, amount);
             amountInput.value = '';
             this.showToast(`Stake voluntário de ${amount} DET realizado com sucesso!`, 'success');
+            this.updateWalletPage();
         } catch (error) {
+            console.error('Erro ao realizar stake voluntário:', error.message);
             this.showToast(error.message, 'error');
         }
     }
@@ -1044,9 +1057,15 @@ class DetHabitsApp {
     unstakeVoluntary() {
         console.log('Retirando stake voluntário');
         try {
+            if (!this.stakingManager) {
+                throw new Error('Sistema de staking não inicializado.');
+            }
             const amount = this.stakingManager.unstakeVoluntary();
+            this.addTransaction('unstake', `Retirada de Stake Voluntário: ${amount} DET`, amount);
             this.showToast(`Retirada de ${amount} DET do stake voluntário realizada com sucesso!`, 'success');
+            this.updateWalletPage();
         } catch (error) {
+            console.error('Erro ao retirar stake voluntário:', error.message);
             this.showToast(error.message, 'error');
         }
     }
@@ -1054,9 +1073,15 @@ class DetHabitsApp {
     withdrawMaxObligatory() {
         console.log('Retirando máximo do stake obrigatório');
         try {
+            if (!this.stakingManager) {
+                throw new Error('Sistema de staking não inicializado.');
+            }
             const amount = this.stakingManager.withdrawMaxObligatory();
+            this.addTransaction('unstake', `Retirada de Stake Obrigatório: ${amount} DET`, amount);
             this.showToast(`Retirada de ${amount} DET do stake obrigatório realizada com sucesso!`, 'success');
+            this.updateWalletPage();
         } catch (error) {
+            console.error('Erro ao retirar stake obrigatório:', error.message);
             this.showToast(error.message, 'error');
         }
     }
@@ -1064,9 +1089,15 @@ class DetHabitsApp {
     withdrawMaxVoluntary() {
         console.log('Retirando máximo do stake voluntário');
         try {
+            if (!this.stakingManager) {
+                throw new Error('Sistema de staking não inicializado.');
+            }
             const amount = this.stakingManager.withdrawMaxVoluntary();
+            this.addTransaction('unstake', `Retirada de Stake Voluntário: ${amount} DET`, amount);
             this.showToast(`Retirada de ${amount} DET do stake voluntário realizada com sucesso!`, 'success');
+            this.updateWalletPage();
         } catch (error) {
+            console.error('Erro ao retirar stake voluntário:', error.message);
             this.showToast(error.message, 'error');
         }
     }
@@ -1152,6 +1183,18 @@ class DetHabitsApp {
 
 document.addEventListener('DOMContentLoaded', () => {
     console.log('DOM carregado, inicializando app');
-    window.app = new DetHabitsApp();
-    window.app.init();
+    try {
+        window.app = new DetHabitsApp();
+        window.app.init();
+    } catch (error) {
+        console.error('Erro ao inicializar DetHabitsApp:', error);
+        const toastContainer = document.getElementById('toast-container');
+        if (toastContainer) {
+            const toast = document.createElement('div');
+            toast.className = 'toast error';
+            toast.textContent = 'Erro ao inicializar a aplicação. Verifique o console para mais detalhes.';
+            toastContainer.appendChild(toast);
+            setTimeout(() => toast.remove(), 5000);
+        }
+    }
 });
