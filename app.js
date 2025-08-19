@@ -10,6 +10,7 @@ class DetHabitsApp {
             fractionalYieldVoluntary: 0,
             dailyYieldObligatoryAccumulated: 0,
             dailyYieldVoluntaryAccumulated: 0,
+            lastYieldUpdateTime: Date.now(), // Para rastrear a última atualização
             lastYieldResetDate: new Date().toDateString(),
             spendingBalance: 0,
             completedMissions: [],
@@ -27,7 +28,7 @@ class DetHabitsApp {
         this.currentMission = null;
         this.nextMissionReset = null;
         this.minuteYieldRate = 10 / (365 * 24 * 60) / 100; // 10% anual por minuto
-        this.secondYieldRate = this.minuteYieldRate / 60;
+        this.secondYieldRate = this.minuteYieldRate / 60; // Para UI em tempo real
         this.yieldInterval = null;
         this.uiYieldInterval = null;
     }
@@ -56,25 +57,61 @@ class DetHabitsApp {
     initStaking() {
         console.log('Inicializando funcionalidades de staking...');
         try {
-            this.startYieldUpdater();
+            // Carregar rendimentos pendentes desde a última atualização
+            this.updateYieldsSinceLastUpdate();
+            // Iniciar intervalos de atualização
+            if (this.yieldInterval) clearInterval(this.yieldInterval);
+            if (this.uiYieldInterval) clearInterval(this.uiYieldInterval);
+            this.yieldInterval = setInterval(() => this.updateYields(), 60000);
+            this.uiYieldInterval = setInterval(() => this.updateYieldsUI(), 1000);
         } catch (error) {
             console.error('Erro ao inicializar staking:', error);
             this.showToast('Erro ao inicializar staking. Funcionalidades de stake podem não funcionar.', 'error');
         }
     }
 
-    // --- Staking Logic ---
-    startYieldUpdater() {
-        console.log('Iniciando atualizador de rendimentos');
+    updateYieldsSinceLastUpdate() {
+        console.log('Atualizando rendimentos desde a última atualização');
         try {
-            if (this.yieldInterval) clearInterval(this.yieldInterval);
-            if (this.uiYieldInterval) clearInterval(this.uiYieldInterval);
-            this.resetDailyYields();
-            this.yieldInterval = setInterval(() => this.updateYields(), 60000);
-            this.uiYieldInterval = setInterval(() => this.updateYieldsUI(), 1000);
+            if (!this.wallet) {
+                console.warn('Carteira não conectada, pulando atualização de rendimentos');
+                return;
+            }
+            const now = Date.now();
+            const lastUpdate = this.userData.lastYieldUpdateTime || now;
+            const minutesElapsed = (now - lastUpdate) / (1000 * 60);
+
+            if (minutesElapsed > 0) {
+                const obligatoryYield = (this.userData.stakeBalance || 0) * this.minuteYieldRate * minutesElapsed;
+                const voluntaryYield = (this.userData.voluntaryStakeBalance || 0) * this.minuteYieldRate * minutesElapsed;
+
+                this.userData.fractionalYieldObligatory = (this.userData.fractionalYieldObligatory || 0) + obligatoryYield;
+                this.userData.fractionalYieldVoluntary = (this.userData.fractionalYieldVoluntary || 0) + voluntaryYield;
+
+                const obligatoryWhole = Math.floor(this.userData.fractionalYieldObligatory);
+                const voluntaryWhole = Math.floor(this.userData.fractionalYieldVoluntary);
+
+                if (obligatoryWhole >= 1) {
+                    this.userData.stakeBalance = (this.userData.stakeBalance || 0) + obligatoryWhole;
+                    this.userData.fractionalYieldObligatory -= obligatoryWhole;
+                    this.userData.dailyYieldObligatoryAccumulated = (this.userData.dailyYieldObligatoryAccumulated || 0) + obligatoryWhole;
+                    this.addTransaction('yield', `Rendimento Obrigatório: +${obligatoryWhole.toFixed(5)} DET`, obligatoryWhole);
+                }
+
+                if (voluntaryWhole >= 1) {
+                    this.userData.voluntaryStakeBalance = (this.userData.voluntaryStakeBalance || 0) + voluntaryWhole;
+                    this.userData.fractionalYieldVoluntary -= voluntaryWhole;
+                    this.userData.dailyYieldVoluntaryAccumulated = (this.userData.dailyYieldVoluntaryAccumulated || 0) + voluntaryWhole;
+                    this.addTransaction('yield', `Rendimento Voluntário: +${voluntaryWhole.toFixed(5)} DET`, voluntaryWhole);
+                }
+
+                this.userData.lastYieldUpdateTime = now;
+                this.saveUserData();
+                console.log('Rendimentos pendentes atualizados:', { obligatoryYield, voluntaryYield });
+            }
         } catch (error) {
-            console.error('Erro no startYieldUpdater:', error);
-            this.showToast('Erro ao iniciar atualizador de rendimentos.', 'error');
+            console.error('Erro ao atualizar rendimentos pendentes:', error);
+            this.showToast('Erro ao atualizar rendimentos pendentes.', 'error');
         }
     }
 
@@ -89,10 +126,10 @@ class DetHabitsApp {
             const today = now.toDateString();
 
             if ((this.userData.lastYieldResetDate || '') !== today) {
-                console.log('Resetando rendimentos diários');
-                this.resetDailyYields();
+                console.log('Novo dia detectado, transferindo rendimentos fracionários');
+                this.transferFractionalYields();
                 this.userData.lastYieldResetDate = today;
-                this.showToast('Rendimentos diários foram resetados com sucesso!', 'success');
+                this.showToast('Rendimentos fracionários transferidos para o próximo dia!', 'success');
             }
 
             const obligatoryYield = (this.userData.stakeBalance || 0) * this.minuteYieldRate;
@@ -108,18 +145,19 @@ class DetHabitsApp {
                 this.userData.stakeBalance = (this.userData.stakeBalance || 0) + obligatoryWhole;
                 this.userData.fractionalYieldObligatory -= obligatoryWhole;
                 this.userData.dailyYieldObligatoryAccumulated = (this.userData.dailyYieldObligatoryAccumulated || 0) + obligatoryWhole;
-                this.addTransaction('yield', `Rendimento Obrigatório: +${obligatoryWhole} DET`, obligatoryWhole);
-                this.showToast(`Você ganhou ${obligatoryWhole} DET no stake obrigatório!`, 'success');
+                this.addTransaction('yield', `Rendimento Obrigatório: +${obligatoryWhole.toFixed(5)} DET`, obligatoryWhole);
+                this.showToast(`Você ganhou ${obligatoryWhole.toFixed(5)} DET no stake obrigatório!`, 'success');
             }
 
             if (voluntaryWhole >= 1) {
                 this.userData.voluntaryStakeBalance = (this.userData.voluntaryStakeBalance || 0) + voluntaryWhole;
                 this.userData.fractionalYieldVoluntary -= voluntaryWhole;
                 this.userData.dailyYieldVoluntaryAccumulated = (this.userData.dailyYieldVoluntaryAccumulated || 0) + voluntaryWhole;
-                this.addTransaction('yield', `Rendimento Voluntário: +${voluntaryWhole} DET`, voluntaryWhole);
-                this.showToast(`Você ganhou ${voluntaryWhole} DET no stake voluntário!`, 'success');
+                this.addTransaction('yield', `Rendimento Voluntário: +${voluntaryWhole.toFixed(5)} DET`, voluntaryWhole);
+                this.showToast(`Você ganhou ${voluntaryWhole.toFixed(5)} DET no stake voluntário!`, 'success');
             }
 
+            this.userData.lastYieldUpdateTime = Date.now();
             this.updateStakeLockTimer();
             this.saveUserData();
             this.updateUI();
@@ -167,8 +205,8 @@ class DetHabitsApp {
         }
     }
 
-    resetDailyYields() {
-        console.log('Resetando rendimentos diários');
+    transferFractionalYields() {
+        console.log('Transferindo rendimentos fracionários para saldos');
         try {
             const obligatoryYield = Math.floor(this.userData.fractionalYieldObligatory || 0);
             const voluntaryYield = Math.floor(this.userData.fractionalYieldVoluntary || 0);
@@ -176,32 +214,34 @@ class DetHabitsApp {
             if (obligatoryYield >= 1) {
                 this.userData.stakeBalance = (this.userData.stakeBalance || 0) + obligatoryYield;
                 this.userData.fractionalYieldObligatory -= obligatoryYield;
-                this.addTransaction('yield', `Rendimento Obrigatório Acumulado: +${obligatoryYield} DET`, obligatoryYield);
+                this.userData.dailyYieldObligatoryAccumulated = (this.userData.dailyYieldObligatoryAccumulated || 0) + obligatoryYield;
+                this.addTransaction('yield', `Rendimento Obrigatório Acumulado: +${obligatoryYield.toFixed(5)} DET`, obligatoryYield);
             }
 
             if (voluntaryYield >= 1) {
                 this.userData.voluntaryStakeBalance = (this.userData.voluntaryStakeBalance || 0) + voluntaryYield;
                 this.userData.fractionalYieldVoluntary -= voluntaryYield;
-                this.addTransaction('yield', `Rendimento Voluntário Acumulado: +${voluntaryYield} DET`, voluntaryYield);
+                this.userData.dailyYieldVoluntaryAccumulated = (this.userData.dailyYieldVoluntaryAccumulated || 0) + voluntaryYield;
+                this.addTransaction('yield', `Rendimento Voluntário Acumulado: +${voluntaryYield.toFixed(5)} DET`, voluntaryYield);
             }
 
-            this.userData.dailyYieldObligatoryAccumulated = 0;
-            this.userData.dailyYieldVoluntaryAccumulated = 0;
-            this.userData.fractionalYieldObligatory = 0;
-            this.userData.fractionalYieldVoluntary = 0;
+            // Apenas resetar a parte fracionária, mantendo acumulados
+            this.userData.fractionalYieldObligatory = (this.userData.fractionalYieldObligatory || 0) % 1;
+            this.userData.fractionalYieldVoluntary = (this.userData.fractionalYieldVoluntary || 0) % 1;
             this.saveUserData();
         } catch (error) {
-            console.error('Erro ao resetar rendimentos diários:', error);
-            this.showToast('Erro ao resetar rendimentos diários.', 'error');
+            console.error('Erro ao transferir rendimentos fracionários:', error);
+            this.showToast('Erro ao transferir rendimentos fracionários.', 'error');
         }
     }
 
     stakeVoluntary(amount) {
         console.log('Tentando realizar stake voluntário:', amount);
         try {
-            if (!Number.isInteger(amount) || amount <= 0) {
+            amount = parseFloat(amount.toFixed(5)); // Permitir decimais com 5 casas
+            if (isNaN(amount) || amount <= 0) {
                 console.error('Quantidade inválida para stake:', amount);
-                throw new Error('Por favor, insira uma quantidade válida (número inteiro positivo).');
+                throw new Error('Por favor, insira uma quantidade válida (positivo).');
             }
             if (amount > 10000) {
                 console.error('Quantidade excede o limite máximo:', amount);
@@ -212,15 +252,15 @@ class DetHabitsApp {
                     totalBalance: this.userData.totalBalance,
                     amount
                 });
-                throw new Error(`Saldo insuficiente. Você tem ${(this.userData.totalBalance || 0).toFixed(5)} DET, mas tentou fazer stake de ${amount} DET.`);
+                throw new Error(`Saldo insuficiente. Você tem ${(this.userData.totalBalance || 0).toFixed(5)} DET, mas tentou fazer stake de ${amount.toFixed(5)} DET.`);
             }
             this.userData.totalBalance -= amount;
             this.userData.voluntaryStakeBalance = (this.userData.voluntaryStakeBalance || 0) + amount;
-            this.addTransaction('stake', `Stake Voluntário: ${amount} DET`, amount);
+            this.addTransaction('stake', `Stake Voluntário: ${amount.toFixed(5)} DET`, amount);
             this.saveUserData();
             this.updateUI();
             console.log('Stake voluntário realizado:', amount);
-            this.showToast(`Stake voluntário de ${amount} DET realizado com sucesso!`, 'success');
+            this.showToast(`Stake voluntário de ${amount.toFixed(5)} DET realizado com sucesso!`, 'success');
             return amount;
         } catch (error) {
             console.error('Erro ao realizar stake voluntário:', error);
@@ -231,16 +271,17 @@ class DetHabitsApp {
     unstakeVoluntaryPartial(amount) {
         console.log('Tentando retirar parcialmente do stake voluntário:', amount);
         try {
-            if (!Number.isInteger(amount) || amount <= 0) {
+            amount = parseFloat(amount.toFixed(5)); // Permitir decimais com 5 casas
+            if (isNaN(amount) || amount <= 0) {
                 console.error('Quantidade inválida para retirada:', amount);
-                throw new Error('Por favor, insira uma quantidade válida (número inteiro positivo).');
+                throw new Error('Por favor, insira uma quantidade válida (positivo).');
             }
             if ((this.userData.voluntaryStakeBalance || 0) < amount) {
                 console.error('Quantidade insuficiente no stake voluntário:', {
                     voluntaryStakeBalance: this.userData.voluntaryStakeBalance,
                     amount
                 });
-                throw new Error(`Quantidade insuficiente. Você tem ${(this.userData.voluntaryStakeBalance || 0).toFixed(5)} DET em stake voluntário, mas tentou retirar ${amount} DET.`);
+                throw new Error(`Quantidade insuficiente. Você tem ${(this.userData.voluntaryStakeBalance || 0).toFixed(5)} DET em stake voluntário, mas tentou retirar ${amount.toFixed(5)} DET.`);
             }
             const totalStake = this.userData.voluntaryStakeBalance || 0;
             const proportion = amount / totalStake;
@@ -685,8 +726,9 @@ class DetHabitsApp {
 
             // Definir período de bloqueio de 90 dias para o stake obrigatório, se ainda não definido
             if (!this.userData.stakeLockEnd && stakeBalanceReward > 0) {
-                const now = new Date();
-                this.userData.stakeLockEnd = new Date(now.setDate(now.getDate() + 90)).toISOString();
+                const lockEnd = new Date();
+                lockEnd.setDate(lockEnd.getDate() + 90);
+                this.userData.stakeLockEnd = lockEnd.toISOString();
             }
 
             this.userData.completedMissions.push({ id: this.currentMission.id, completedAt: new Date().toISOString() });
@@ -723,6 +765,7 @@ class DetHabitsApp {
                     fractionalYieldVoluntary: parsedData.fractionalYieldVoluntary || 0,
                     dailyYieldObligatoryAccumulated: parsedData.dailyYieldObligatoryAccumulated || 0,
                     dailyYieldVoluntaryAccumulated: parsedData.dailyYieldVoluntaryAccumulated || 0,
+                    lastYieldUpdateTime: parsedData.lastYieldUpdateTime || Date.now(),
                     spendingBalance: parsedData.spendingBalance || 0,
                     completedMissions: parsedData.completedMissions || [],
                     transactions: parsedData.transactions || [],
@@ -976,10 +1019,10 @@ class DetHabitsApp {
                     return;
                 }
                 this.userData.totalBalance += detAmount;
-                this.addTransaction('presale', `Compra na Pré-venda: +${detAmount} DET`, detAmount);
+                this.addTransaction('presale', `Compra na Pré-venda: +${detAmount.toFixed(5)} DET`, detAmount);
                 this.saveUserData();
                 this.updateUI();
-                this.showToast(`Compra de ${detAmount} DET realizada com sucesso!`, 'success');
+                this.showToast(`Compra de ${detAmount.toFixed(5)} DET realizada com sucesso!`, 'success');
             });
         }
 
@@ -1049,7 +1092,7 @@ class DetHabitsApp {
                     return;
                 }
                 this.userData.spendingBalance -= price;
-                this.addTransaction('purchase', `Compra: ${item.querySelector('h4').textContent} (-${price} DET)`, -price);
+                this.addTransaction('purchase', `Compra: ${item.querySelector('h4').textContent} (-${price.toFixed(5)} DET)`, -price);
                 this.saveUserData();
                 this.updateUI();
                 this.showToast('Item comprado com sucesso!', 'success');
@@ -1083,7 +1126,7 @@ class DetHabitsApp {
                     this.showToast('Erro: Campo de stake não encontrado.', 'error');
                     return;
                 }
-                const amount = parseInt(stakeAmountInput.value);
+                const amount = parseFloat(stakeAmountInput.value);
                 try {
                     this.stakeVoluntary(amount);
                     stakeAmountInput.value = '';
@@ -1103,7 +1146,7 @@ class DetHabitsApp {
                     this.showToast('Erro: Campo de retirada não encontrado.', 'error');
                     return;
                 }
-                const amount = parseInt(unstakeAmountInput.value);
+                const amount = parseFloat(unstakeAmountInput.value);
                 try {
                     this.unstakeVoluntaryPartial(amount);
                     unstakeAmountInput.value = '';
