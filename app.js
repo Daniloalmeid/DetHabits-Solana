@@ -40,23 +40,29 @@ class DetHabitsApp {
             );
         } catch (error) {
             console.error('Erro ao inicializar StakingManager:', error);
-            this.showToast('Erro ao inicializar o sistema de staking. Algumas funcionalidades podem estar indisponíveis.', 'error');
+            this.showToast('Erro ao inicializar o sistema de staking. A conexão com a carteira ainda deve funcionar.', 'error');
+            this.stakingManager = null;
         }
     }
 
     async init() {
         console.log('Inicializando DetHabitsApp...');
-        await this.loadAllMissions();
-        this.loadUserData();
-        this.selectDailyMissions();
-        this.setupEventListeners();
-        this.updateUI();
-        this.startMissionTimer();
-        this.loadMissions();
-        if (this.stakingManager) {
-            this.stakingManager.startYieldUpdater();
+        try {
+            await this.loadAllMissions();
+            this.loadUserData();
+            this.selectDailyMissions();
+            this.setupEventListeners();
+            this.updateUI();
+            this.startMissionTimer();
+            this.loadMissions();
+            if (this.stakingManager) {
+                this.stakingManager.startYieldUpdater();
+            }
+            this.startBackupInterval();
+        } catch (error) {
+            console.error('Erro durante inicialização:', error);
+            this.showToast('Erro ao inicializar a aplicação. Verifique o console.', 'error');
         }
-        this.startBackupInterval();
     }
 
     async loadAllMissions() {
@@ -197,8 +203,7 @@ class DetHabitsApp {
         };
 
         updateTimer();
-        const intervalId = setInterval(updateTimer, 1000);
-        console.log('setInterval configurado com ID:', intervalId);
+        setInterval(updateTimer, 1000);
     }
 
     setupEventListeners() {
@@ -206,6 +211,8 @@ class DetHabitsApp {
         const connectButton = document.getElementById('connect-wallet-btn');
         if (connectButton) {
             connectButton.addEventListener('click', () => this.connectWallet());
+        } else {
+            console.error('Botão connect-wallet-btn não encontrado');
         }
         document.querySelectorAll('.nav-button').forEach(btn => {
             btn.addEventListener('click', (e) => this.navigateTo(e.target.dataset.page));
@@ -287,8 +294,13 @@ class DetHabitsApp {
     }
 
     copyAppUrl() {
-        const appUrl = document.getElementById('app-url').textContent;
-        navigator.clipboard.writeText(appUrl).then(() => {
+        const appUrl = document.getElementById('app-url');
+        if (!appUrl) {
+            console.error('Elemento app-url não encontrado');
+            this.showToast('Erro ao copiar a URL.', 'error');
+            return;
+        }
+        navigator.clipboard.writeText(appUrl.textContent).then(() => {
             this.showToast('URL copiada para a área de transferência!', 'success');
         }).catch(() => {
             this.showToast('Erro ao copiar a URL.', 'error');
@@ -296,8 +308,13 @@ class DetHabitsApp {
     }
 
     copyPresaleWallet() {
-        const presaleWallet = document.getElementById('presale-wallet').textContent;
-        navigator.clipboard.writeText(presaleWallet).then(() => {
+        const presaleWallet = document.getElementById('presale-wallet');
+        if (!presaleWallet) {
+            console.error('Elemento presale-wallet não encontrado');
+            this.showToast('Erro ao copiar a carteira da pré-venda.', 'error');
+            return;
+        }
+        navigator.clipboard.writeText(presaleWallet.textContent).then(() => {
             this.showToast('Carteira da pré-venda copiada!', 'success');
         }).catch(() => {
             this.showToast('Erro ao copiar a carteira da pré-venda.', 'error');
@@ -347,7 +364,6 @@ class DetHabitsApp {
                 'error'
             );
         } finally {
-            console.log('Finalizando tentativa de conexão');
             this.hideLoading();
         }
     }
@@ -357,8 +373,10 @@ class DetHabitsApp {
         this.saveUserData();
         this.backupUserData();
         this.wallet = null;
-        document.getElementById('home-page').style.display = 'block';
-        document.getElementById('navbar').style.display = 'none';
+        const homePage = document.getElementById('home-page');
+        const navbar = document.getElementById('navbar');
+        if (homePage) homePage.style.display = 'block';
+        if (navbar) navbar.style.display = 'none';
         this.navigateTo('home');
         this.showToast('Carteira desconectada', 'success');
     }
@@ -369,7 +387,8 @@ class DetHabitsApp {
             return;
         }
         console.log('Atualizando display da carteira:', this.wallet);
-        document.getElementById('navbar').style.display = 'block';
+        const navbar = document.getElementById('navbar');
+        if (navbar) navbar.style.display = 'block';
         const walletAddressElement = document.getElementById('wallet-address');
         if (walletAddressElement) {
             walletAddressElement.textContent =
@@ -618,41 +637,41 @@ class DetHabitsApp {
         console.log('Atualizando página da wallet');
         const totalBalanceElement = document.getElementById('total-balance');
         if (totalBalanceElement) {
-            totalBalanceElement.textContent = this.userData.totalBalance.toFixed(0) || 0;
+            totalBalanceElement.textContent = (this.userData.totalBalance || 0).toFixed(0);
         }
         const stakeBalanceElement = document.getElementById('stake-balance');
         if (stakeBalanceElement) {
-            stakeBalanceElement.textContent = this.userData.stakeBalance.toFixed(0) || 0;
+            stakeBalanceElement.textContent = (this.userData.stakeBalance || 0).toFixed(0);
         }
         const spendingBalanceElement = document.getElementById('spending-balance');
         if (spendingBalanceElement) {
-            spendingBalanceElement.textContent = this.userData.spendingBalance.toFixed(0) || 0;
+            spendingBalanceElement.textContent = (this.userData.spendingBalance || 0).toFixed(0);
         }
         const voluntaryStakeBalanceElement = document.getElementById('voluntary-stake-balance');
         if (voluntaryStakeBalanceElement) {
-            voluntaryStakeBalanceElement.textContent = this.userData.voluntaryStakeBalance.toFixed(0) || 0;
+            voluntaryStakeBalanceElement.textContent = (this.userData.voluntaryStakeBalance || 0).toFixed(0);
         }
         const dailyYieldElement = document.getElementById('daily-yield');
         if (dailyYieldElement) {
-            const totalObligatoryYield = (this.userData.dailyYieldObligatoryAccumulated + this.userData.fractionalYieldObligatory).toFixed(5);
+            const totalObligatoryYield = ((this.userData.dailyYieldObligatoryAccumulated || 0) + (this.userData.fractionalYieldObligatory || 0)).toFixed(5);
             dailyYieldElement.textContent = `+${totalObligatoryYield} DET`;
         }
         const dailyYieldVoluntaryElement = document.getElementById('daily-yield-voluntary');
         if (dailyYieldVoluntaryElement) {
-            const totalVoluntaryYield = (this.userData.dailyYieldVoluntaryAccumulated + this.userData.fractionalYieldVoluntary).toFixed(5);
+            const totalVoluntaryYield = ((this.userData.dailyYieldVoluntaryAccumulated || 0) + (this.userData.fractionalYieldVoluntary || 0)).toFixed(5);
             dailyYieldVoluntaryElement.textContent = `+${totalVoluntaryYield} DET`;
         }
         const withdrawBtn = document.getElementById('withdraw-btn');
         if (withdrawBtn) {
-            withdrawBtn.disabled = this.userData.totalBalance < 800;
+            withdrawBtn.disabled = (this.userData.totalBalance || 0) < 800;
         }
         const withdrawMaxObligatoryButton = document.getElementById('withdraw-max-obligatory-btn');
         if (withdrawMaxObligatoryButton) {
-            withdrawMaxObligatoryButton.disabled = this.userData.stakeBalance <= 0;
+            withdrawMaxObligatoryButton.disabled = (this.userData.stakeBalance || 0) <= 0;
         }
         const withdrawMaxVoluntaryButton = document.getElementById('withdraw-max-voluntary-btn');
         if (withdrawMaxVoluntaryButton) {
-            withdrawMaxVoluntaryButton.disabled = this.userData.voluntaryStakeBalance <= 0;
+            withdrawMaxVoluntaryButton.disabled = (this.userData.voluntaryStakeBalance || 0) <= 0;
         }
         this.loadTransactionHistory();
     }
@@ -661,7 +680,7 @@ class DetHabitsApp {
         console.log('Atualizando página da loja');
         const shopBalanceElement = document.getElementById('shop-balance');
         if (shopBalanceElement) {
-            shopBalanceElement.textContent = `${this.userData.spendingBalance.toFixed(0)} DET`;
+            shopBalanceElement.textContent = `${(this.userData.spendingBalance || 0).toFixed(0)} DET`;
         }
     }
 
@@ -768,7 +787,7 @@ class DetHabitsApp {
         const itemCard = event.target.closest('.shop-item');
         const itemName = itemCard.querySelector('h4').textContent;
         const itemPrice = parseInt(itemCard.querySelector('.item-price').textContent);
-        if (this.userData.spendingBalance < itemPrice) {
+        if ((this.userData.spendingBalance || 0) < itemPrice) {
             this.showToast('Saldo insuficiente para esta compra.', 'error');
             return;
         }
@@ -961,7 +980,7 @@ class DetHabitsApp {
             }
         }
         this.userData = {
-            totalBalance: 26, // Definindo saldo inicial como 26 DET conforme informado
+            totalBalance: 26, // Definindo saldo inicial como 26 DET
             stakeBalance: 0,
             spendingBalance: 0,
             voluntaryStakeBalance: 0,
@@ -1038,6 +1057,11 @@ class DetHabitsApp {
     stakeVoluntary() {
         console.log('Realizando stake voluntário');
         const amountInput = document.getElementById('stake-amount-input');
+        if (!amountInput) {
+            console.error('Elemento stake-amount-input não encontrado');
+            this.showToast('Erro: Campo de stake não encontrado.', 'error');
+            return;
+        }
         const amount = parseInt(amountInput.value);
         try {
             if (!this.stakingManager) {
@@ -1108,23 +1132,28 @@ class DetHabitsApp {
             this.showToast('Carteira não conectada. Conecte sua carteira Phantom primeiro.', 'error');
             return;
         }
-        if (this.userData.totalBalance < 800) {
+        if ((this.userData.totalBalance || 0) < 800) {
             this.showToast('Saldo mínimo para retirada é 800 DET.', 'error');
+            return;
+        }
+        if (!window.solana || !window.solanaWeb3 || !window.splToken) {
+            console.error('Bibliotecas Solana não carregadas');
+            this.showToast('Erro: Bibliotecas Solana não disponíveis. Verifique sua conexão.', 'error');
             return;
         }
         try {
             this.showLoading('Enviando DET para carteira Solana...');
-            const connection = new solanaWeb3.Connection(solanaWeb3.clusterApiUrl('devnet'), 'confirmed');
-            const fromPubkey = new solanaWeb3.PublicKey(this.wallet);
-            const toPubkey = new solanaWeb3.PublicKey(this.wallet);
-            const tokenMint = new solanaWeb3.PublicKey('TOKEN_MINT_DET_AQUI');
-            const fromATA = await splToken.getAssociatedTokenAddress(tokenMint, fromPubkey);
-            const toATA = await splToken.getAssociatedTokenAddress(tokenMint, toPubkey);
+            const connection = new window.solanaWeb3.Connection(window.solanaWeb3.clusterApiUrl('devnet'), 'confirmed');
+            const fromPubkey = new window.solanaWeb3.PublicKey(this.wallet);
+            const toPubkey = new window.solanaWeb3.PublicKey(this.wallet);
+            const tokenMint = new window.solanaWeb3.PublicKey('TOKEN_MINT_DET_AQUI');
+            const fromATA = await window.splToken.getAssociatedTokenAddress(tokenMint, fromPubkey);
+            const toATA = await window.splToken.getAssociatedTokenAddress(tokenMint, toPubkey);
 
             const toAccountInfo = await connection.getAccountInfo(toATA);
             if (!toAccountInfo) {
-                const transaction = new solanaWeb3.Transaction().add(
-                    splToken.createAssociatedTokenAccountInstruction(
+                const transaction = new window.solanaWeb3.Transaction().add(
+                    window.splToken.createAssociatedTokenAccountInstruction(
                         fromPubkey,
                         toATA,
                         toPubkey,
@@ -1137,8 +1166,8 @@ class DetHabitsApp {
             }
 
             const amount = this.userData.totalBalance * 1e9;
-            const transaction = new solanaWeb3.Transaction().add(
-                splToken.createTransferInstruction(
+            const transaction = new window.solanaWeb3.Transaction().add(
+                window.splToken.createTransferInstruction(
                     fromATA,
                     toATA,
                     fromPubkey,

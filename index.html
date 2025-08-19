@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DetHabits - Solana</title>
     <link rel="stylesheet" href="styles.css">
-    <script src="https://unpkg.com/@solana/web3.js@1.95.3/dist/index.iife.min.js"></script>
-    <script src="https://unpkg.com/@solana/spl-token@0.4.8/dist/index.iife.min.js"></script>
-    <script type="module" src="staking.js"></script>
+    <script src="https://unpkg.com/@solana/web3.js@1.95.3/dist/index.iife.js"></script>
+    <script src="https://unpkg.com/@solana/spl-token@0.4.8/dist/index.iife.js"></script>
+    <script type="module" src="stake.js"></script>
     <script type="module" src="app.js" defer></script>
 </head>
 <body>
@@ -126,8 +126,6 @@
                         </div>
                     </div>
                     <div class="stake-input">
-                        <input type="number" id="withdraw-obligatory-amount" placeholder="Quantidade para sacar" min="1">
-                        <button id="withdraw-obligatory-btn" class="btn-secondary">Sacar</button>
                         <button id="withdraw-max-obligatory-btn" class="btn-secondary full-width">Sacar Máximo</button>
                     </div>
                 </div>
@@ -331,7 +329,7 @@
                     <ul>
                         <li><strong>Preço do Token:</strong> $0.02</li>
                         <li><strong>Compra Mínima:</strong> 500 DET</li>
-                        <li><strong>Compra Máxima:</strong> 250.000 DET</li>
+                        <li><strong>Compra Máxima:</strong> 100.000 DET</li>
                         <li><strong>Objetivo:</strong> Financiar o desenvolvimento e expansão do DET Habits</li>
                     </ul>
                     <p><strong>Alocação dos Fundos:</strong></p>
@@ -376,8 +374,8 @@
                                 <td>+15%</td>
                             </tr>
                             <tr>
-                                <td>50.000 a 250.000 DET</td>
-                                <td>+30%</td>
+                                <td>50.000 a 100.000 DET</td>
+                                <td>+25%</td>
                             </tr>
                         </tbody>
                     </table>
@@ -511,7 +509,7 @@
                         </tbody>
                     </table>
                     <h3>Benefícios da Pré-venda</h3>
-                    <p>Usuários que participarem da pré-venda ganharão acesso a missões VIP exclusivas com bônus proporcionais, com base na quantidade de tokens DET que possuem.</p>
+                    <p>Usuários que participarem da pré-venda ganharão acesso a missões VIP exclusivas com recompensas altas, com base na quantidade de tokens DET que possuem.</p>
                     <table class="vip-table">
                         <thead>
                             <tr>
