@@ -573,6 +573,15 @@ body {
     color: #EF4444;
 }
 
+.yield-update {
+    animation: fadeIn 0.5s ease-in-out;
+}
+
+@keyframes fadeIn {
+    0% { opacity: 0.5; transform: scale(1.1); }
+    100% { opacity: 1; transform: scale(1); }
+}
+
 /* Shop Page */
 #shop-page .page-header {
     display: flex;
