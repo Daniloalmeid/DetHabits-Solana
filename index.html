@@ -162,7 +162,10 @@
                         <span>Ganhos de Sorteios:</span>
                         <span id="lottery-winnings">0</span> DET
                     </div>
-                    <button id="transfer-lottery-btn" class="btn-primary full-width" disabled>Transferir Ganhos para Saldo Total</button>
+                    <div class="transfer-input">
+                        <input type="number" id="transfer-amount-input" placeholder="Quantidade para transferir (DET)" min="0.00001" step="0.00001">
+                        <button id="transfer-lottery-btn" class="btn-primary full-width" disabled>Transferir Ganhos para Saldo Total</button>
+                    </div>
                 </div>
             </div>
             <div class="transaction-history">
@@ -630,6 +633,23 @@
 
         <!-- Toast Notifications -->
         <div id="toast-container" class="toast-container"></div>
+
+        <!-- Lottery Win Modal -->
+        <div id="lottery-win-modal" class="modal">
+            <div class="modal-content lottery-win-modal">
+                <div class="modal-header">
+                    <h3>Parabéns!</h3>
+                    <button id="close-lottery-modal" class="close-btn">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="lottery-win-content">
+                        <div class="lottery-win-emoji">🎉</div>
+                        <p id="lottery-win-message">Você abriu o Baú e ganhou X DET!</p>
+                        <div class="particle-container"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </body>
 </html>

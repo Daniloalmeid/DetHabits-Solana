@@ -602,6 +602,19 @@ body {
     color: #38B2AC;
 }
 
+.transfer-input {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.transfer-input input {
+    padding: 0.75rem;
+    border: 1px solid #D1E7EE;
+    border-radius: 8px;
+    font-size: 1rem;
+}
+
 #transfer-lottery-btn {
     background-color: #60A5FA;
     color: white;
@@ -1131,6 +1144,59 @@ body {
     margin-top: 1rem;
 }
 
+/* Lottery Win Modal */
+.lottery-win-modal {
+    background: linear-gradient(135deg, #FFD700, #FFA500);
+    color: #1F2937;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+}
+
+.lottery-win-content {
+    position: relative;
+    z-index: 1;
+}
+
+.lottery-win-emoji {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+}
+
+#lottery-win-message {
+    font-size: 1.2rem;
+    font-weight: 500;
+}
+
+.particle-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+}
+
+.particle {
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    background: rgba(255, 255, 255, 0.7);
+    border-radius: 50%;
+    animation: particleFall 2s ease-out forwards;
+}
+
+@keyframes particleFall {
+    0% {
+        transform: translateY(-100%) scale(0);
+        opacity: 1;
+    }
+    100% {
+        transform: translateY(100vh) scale(1);
+        opacity: 0;
+    }
+}
+
 /* Loading Overlay */
 .loading-overlay {
     display: none;
@@ -1205,35 +1271,6 @@ body {
     100% { opacity: 0; transform: translateY(20px); }
 }
 
-.toast.lottery-win {
-    background: linear-gradient(135deg, #FFD700, #FFA500);
-    color: #1F2937;
-    font-weight: 600;
-    font-size: 1.1rem;
-    padding: 1rem 2rem;
-    border-radius: 12px;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    animation: popIn 0.5s ease-out, fadeOut 5s ease-in-out 2s;
-}
-
-.toast.lottery-win::before {
-    content: '🎉';
-    font-size: 1.5rem;
-}
-
-@keyframes popIn {
-    0% { transform: scale(0.8); opacity: 0; }
-    100% { transform: scale(1); opacity: 1; }
-}
-
-@keyframes fadeOut {
-    0% { opacity: 1; }
-    100% { opacity: 0; }
-}
-
 /* Responsividade */
 @media (max-width: 768px) {
     .page-header {
@@ -1264,5 +1301,9 @@ body {
 
     .mission-card, .wallet-card, .stat-card, .lottery-item {
         padding: 1rem;
+    }
+
+    .lottery-win-modal {
+        width: 95%;
     }
 }
