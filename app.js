@@ -1,3 +1,5 @@
+/* global window */
+
 class DetHabitsApp {
     constructor() {
         console.log('Construindo DetHabitsApp...');
@@ -15,7 +17,7 @@ class DetHabitsApp {
             spendingBalance: 0,
             completedMissions: [],
             transactions: [],
-            lastMissionResetDate: new Date().toDateString(),
+            lastMissionResetDate: Date.now(),
             dailyMissions: [],
             fixedMissions: [],
             stakeLockEnd: null
@@ -32,22 +34,27 @@ class DetHabitsApp {
         this.uiYieldInterval = null;
     }
 
-    /**
-     * Inicializa a aplicação, carregando missões e configurando a interface.
-     * @async
-     */
     async init() {
         console.log('Inicializando DetHabitsApp...');
         try {
-            await this.loadAllMissions();
+            // Carregar dados do usuário primeiro
             this.loadUserData();
+            // Carregar missões do JSON
+            await this.loadAllMissions();
+            // Selecionar missões diárias, mantendo as existentes se válido
             this.selectDailyMissions();
-            this.setupEventListeners();
-            this.startMissionTimer();
+            // Carregar missões na UI imediatamente
             this.loadMissions();
+            // Iniciar temporizador após carregar missões
+            this.startMissionTimer();
+            // Atualizar UI
             this.updateUI();
+            // Configurar eventos
+            this.setupEventListeners();
+            // Iniciar backup automático
             this.startBackupInterval();
-            if (window.solana?.isPhantom) {
+            // Tentar reconexão com Phantom
+            if (window.solana && window.solana.isPhantom) {
                 console.log('Tentando reconexão automática com Phantom...');
                 await this.connectWallet(true);
             }
@@ -57,9 +64,352 @@ class DetHabitsApp {
         }
     }
 
-    /**
-     * Inicializa as funcionalidades de staking.
-     */
+    loadUserData() {
+        console.log('Carregando dados do usuário do localStorage...');
+        try {
+            const savedData = localStorage.getItem(`dethabits_${this.wallet || 'default'}`);
+            if (savedData) {
+                const parsedData = JSON.parse(savedData);
+                // Garantir que lastMissionResetDate seja um número (timestamp)
+                const lastMissionResetDate = parsedData.lastMissionResetDate 
+                    ? Number(parsedData.lastMissionResetDate) 
+                    : Date.now();
+                
+                this.userData = {
+                    ...this.userData,
+                    ...parsedData,
+                    totalBalance: parsedData.totalBalance !== undefined ? parsedData.totalBalance : 294,
+                    stakeBalance: parsedData.stakeBalance || 0,
+                    voluntaryStakeBalance: parsedData.voluntaryStakeBalance || 0,
+                    fractionalYieldObligatory: parsedData.fractionalYieldObligatory || 0,
+                    fractionalYieldVoluntary: parsedData.fractionalYieldVoluntary || 0,
+                    dailyYieldObligatoryAccumulated: parsedData.dailyYieldObligatoryAccumulated || 0,
+                    dailyYieldVoluntaryAccumulated: parsedData.dailyYieldVoluntaryAccumulated || 0,
+                    lastYieldUpdateTime: parsedData.lastYieldUpdateTime || Date.now(),
+                    spendingBalance: parsedData.spendingBalance || 0,
+                    completedMissions: Array.isArray(parsedData.completedMissions) ? parsedData.completedMissions : [],
+                    transactions: Array.isArray(parsedData.transactions) ? parsedData.transactions : [],
+                    dailyMissions: Array.isArray(parsedData.dailyMissions) ? parsedData.dailyMissions : [],
+                    fixedMissions: Array.isArray(parsedData.fixedMissions) ? parsedData.fixedMissions : [],
+                    stakeLockEnd: parsedData.stakeLockEnd || null,
+                    lastYieldResetDate: parsedData.lastYieldResetDate || new Date().toDateString(),
+                    lastMissionResetDate: isNaN(lastMissionResetDate) ? Date.now() : lastMissionResetDate
+                };
+                // Sincronizar this.missions com userData.dailyMissions
+                this.missions = this.userData.dailyMissions.map(mission => ({
+                    ...mission,
+                    completed: this.userData.completedMissions.some(cm => cm.id === mission.id)
+                }));
+                console.log('Dados do usuário carregados:', this.userData);
+            } else {
+                console.log('Nenhum dado encontrado no localStorage, usando valores padrão');
+                this.userData.lastMissionResetDate = Date.now();
+                this.userData.dailyMissions = [];
+                this.missions = [];
+            }
+            this.saveUserData();
+        } catch (error) {
+            console.error('Erro ao carregar dados do usuário:', error);
+            this.showToast('Erro ao carregar dados do usuário. Usando valores padrão.', 'error');
+            this.userData.lastMissionResetDate = Date.now();
+            this.userData.dailyMissions = [];
+            this.missions = [];
+            this.saveUserData();
+        }
+    }
+
+    selectDailyMissions(forceReset = false) {
+        console.log('Selecionando missões diárias...');
+        const now = Date.now();
+        const timeSinceLastReset = now - this.userData.lastMissionResetDate;
+        const oneDay = 24 * 60 * 60 * 1000;
+
+        console.log('lastMissionResetDate:', new Date(this.userData.lastMissionResetDate));
+        console.log('Time since last reset:', timeSinceLastReset / (60 * 1000), 'minutes');
+        console.log('forceReset:', forceReset, 'dailyMissions length:', this.userData.dailyMissions.length);
+
+        // Verificar se as missões diárias são válidas (tem ID e correspondem a allMissions)
+        const areMissionsValid = this.userData.dailyMissions.length > 0 &&
+            this.userData.dailyMissions.every(mission =>
+                mission.id && this.allMissions.some(am => am.id === mission.id)
+            );
+
+        if (forceReset || timeSinceLastReset >= oneDay || !areMissionsValid) {
+            console.log('Resetando missões diárias');
+            if (this.allMissions.length === 0) {
+                console.warn('Nenhuma missão diária disponível em allMissions');
+                this.showToast('Nenhuma missão diária disponível. Tente novamente mais tarde.', 'error');
+                return;
+            }
+            // Manter apenas missões fixas concluídas
+            this.userData.completedMissions = this.userData.completedMissions.filter(cm => 
+                this.fixedMissions.some(fm => fm.id === cm.id)
+            );
+            // Selecionar novas missões
+            const shuffledMissions = [...this.allMissions].sort(() => Math.random() - 0.5);
+            this.missions = shuffledMissions.slice(0, 5).map(mission => ({
+                ...mission,
+                reward: this.applyVipBonus(mission.reward),
+                completed: false
+            }));
+            this.userData.dailyMissions = this.missions;
+            this.userData.lastMissionResetDate = now;
+            this.nextMissionReset = now + oneDay;
+            this.saveUserData();
+            console.log('Novas missões diárias selecionadas:', this.missions);
+            this.showToast('Novas missões diárias disponíveis!', 'success');
+        } else {
+            console.log('Carregando missões diárias existentes');
+            this.missions = this.userData.dailyMissions.map(mission => ({
+                ...mission,
+                completed: this.userData.completedMissions.some(cm => cm.id === mission.id)
+            }));
+            this.nextMissionReset = this.userData.lastMissionResetDate + oneDay;
+        }
+        console.log('Próximo reset:', new Date(this.nextMissionReset));
+    }
+
+    startMissionTimer() {
+        console.log('Iniciando temporizador de missões');
+        // Garantir que nextMissionReset esteja inicializado
+        if (!this.nextMissionReset || isNaN(this.nextMissionReset)) {
+            this.nextMissionReset = this.userData.lastMissionResetDate + 24 * 60 * 60 * 1000;
+            if (isNaN(this.nextMissionReset)) {
+                console.warn('nextMissionReset inválido, inicializando com novo valor');
+                this.nextMissionReset = Date.now() + 24 * 60 * 60 * 1000;
+                this.userData.lastMissionResetDate = Date.now();
+                this.saveUserData();
+            }
+        }
+
+        const updateTimer = () => {
+            const now = Date.now();
+            const diff = this.nextMissionReset - now;
+
+            if (diff <= 0) {
+                console.log('Resetando missões diárias');
+                this.selectDailyMissions(true);
+                this.loadMissions();
+                this.updateMissionProgress();
+                this.nextMissionReset = Date.now() + 24 * 60 * 60 * 1000;
+                this.userData.lastMissionResetDate = Date.now();
+                this.saveUserData();
+                this.showToast('Missões diárias resetadas com sucesso!', 'success');
+                return;
+            }
+
+            const hours = Math.floor(diff / (1000 * 60 * 60));
+            const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+            const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+            const missionTimer = document.getElementById('mission-timer');
+            if (missionTimer) {
+                missionTimer.textContent = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+            } else {
+                console.warn('Elemento mission-timer não encontrado');
+            }
+        };
+
+        updateTimer();
+        setInterval(updateTimer, 1000);
+    }
+
+    loadMissions() {
+        console.log('Carregando missões na UI...');
+        const missionsGrid = document.getElementById('missions-grid');
+        const fixedMissionsGrid = document.getElementById('fixed-missions-grid');
+        if (!missionsGrid || !fixedMissionsGrid) {
+            console.warn('Elementos missions-grid ou fixed-missions-grid não encontrados');
+            this.showToast('Erro ao carregar elementos da UI.', 'error');
+            return;
+        }
+
+        // Carregar missões diárias
+        missionsGrid.innerHTML = '';
+        this.missions.forEach(mission => {
+            const isCompleted = this.userData.completedMissions.some(cm => cm.id === mission.id);
+            const missionCard = document.createElement('div');
+            missionCard.className = `mission-card ${isCompleted ? 'completed' : ''}`;
+            missionCard.innerHTML = `
+                <div class="mission-header">
+                    <span class="mission-icon">${mission.icon || '🏆'}</span>
+                    <span class="mission-reward">+${mission.reward} DET</span>
+                </div>
+                <h3 class="mission-title">${mission.title}</h3>
+                <p class="mission-description">${mission.description}</p>
+                ${mission.link ? `<a href="${mission.link}" class="mission-link" target="_blank">Acesse aqui</a>` : ''}
+                <button class="mission-button ${isCompleted ? 'completed' : 'pending'}" data-mission-id="${mission.id}" ${isCompleted ? 'disabled' : ''}>
+                    ${isCompleted ? 'Concluída' : 'Enviar Prova'}
+                </button>
+            `;
+            missionsGrid.appendChild(missionCard);
+        });
+
+        // Carregar missões fixas
+        fixedMissionsGrid.innerHTML = '';
+        this.fixedMissions.forEach(mission => {
+            const isCompleted = this.userData.completedMissions.some(cm => cm.id === mission.id);
+            const missionCard = document.createElement('div');
+            missionCard.className = `mission-card ${isCompleted ? 'completed' : ''}`;
+            missionCard.innerHTML = `
+                <div class="mission-header">
+                    <span class="mission-icon">${mission.icon || '🏆'}</span>
+                    <span class="mission-reward">+${mission.reward} DET</span>
+                </div>
+                <h3 class="mission-title">${mission.title}</h3>
+                <p class="mission-description">${mission.description}</p>
+                ${mission.link ? `<a href="${mission.link}" class="mission-link" target="_blank">Acesse aqui</a>` : ''}
+                <button class="mission-button ${isCompleted ? 'completed' : 'pending'}" data-mission-id="${mission.id}" ${isCompleted ? 'disabled' : ''}>
+                    ${isCompleted ? 'Concluída' : 'Enviar Prova'}
+                </button>
+            `;
+            fixedMissionsGrid.appendChild(missionCard);
+        });
+    }
+
+    openMissionModal(missionId) {
+        console.log('Abrindo modal para missão:', missionId);
+        // Buscar missão em this.missions ou this.fixedMissions
+        const mission = this.missions.find(m => m.id === missionId) || this.fixedMissions.find(m => m.id === missionId);
+        if (!mission) {
+            console.error('Missão não encontrada:', missionId);
+            this.showToast('Missão não encontrada.', 'error');
+            return;
+        }
+        this.currentMission = { ...mission }; // Criar uma cópia para evitar mutação direta
+        const modal = document.getElementById('photo-modal');
+        const modalTitle = document.getElementById('modal-mission-title');
+        if (modal && modalTitle) {
+            modalTitle.textContent = mission.title;
+            modal.classList.add('active');
+        } else {
+            console.warn('Elementos photo-modal ou modal-mission-title não encontrados');
+            this.showToast('Erro ao abrir modal de missão.', 'error');
+        }
+    }
+
+    submitMission() {
+        if (!this.currentMission) {
+            console.error('Nenhuma missão selecionada para envio');
+            this.showToast('Erro: Nenhuma missão selecionada.', 'error');
+            return;
+        }
+        console.log('Enviando missão:', this.currentMission.id);
+        try {
+            const reward = this.currentMission.reward;
+            const totalBalanceReward = reward * 0.8;
+            const stakeBalanceReward = reward * 0.1;
+            const spendingBalanceReward = reward * 0.1;
+
+            this.userData.totalBalance = (this.userData.totalBalance || 0) + totalBalanceReward;
+            this.userData.stakeBalance = (this.userData.stakeBalance || 0) + stakeBalanceReward;
+            this.userData.spendingBalance = (this.userData.spendingBalance || 0) + spendingBalanceReward;
+
+            if (!this.userData.stakeLockEnd && stakeBalanceReward > 0) {
+                const lockEnd = new Date();
+                lockEnd.setDate(lockEnd.getDate() + 90);
+                this.userData.stakeLockEnd = lockEnd.toISOString();
+            }
+
+            // Adicionar missão concluída
+            this.userData.completedMissions.push({ id: this.currentMission.id, completedAt: new Date().toISOString() });
+            this.addTransaction('mission', `Missão Concluída: ${this.currentMission.title} (+${reward} DET: 80% Total, 10% Stake, 10% Gastos)`, reward);
+            
+            // Atualizar status de conclusão em this.missions
+            const missionIndex = this.missions.findIndex(m => m.id === this.currentMission.id);
+            if (missionIndex !== -1) {
+                this.missions[missionIndex].completed = true;
+                this.userData.dailyMissions[missionIndex].completed = true;
+            }
+
+            this.saveUserData();
+            this.loadMissions();
+            this.updateMissionProgress();
+            this.updateUI();
+            this.closeModal();
+            this.showToast(
+                `Missão "${this.currentMission.title}" concluída! Você ganhou ${totalBalanceReward.toFixed(5)} DET no Saldo Total, ${stakeBalanceReward.toFixed(5)} DET no Stake Obrigatório e ${spendingBalanceReward.toFixed(5)} DET no Saldo de Gastos!`,
+                'success'
+            );
+        } catch (error) {
+            console.error('Erro ao enviar missão:', error);
+            this.showToast('Erro ao enviar missão.', 'error');
+        }
+    }
+
+    async connectWallet(onlyIfTrusted = false) {
+        console.log(`Tentando conectar carteira (onlyIfTrusted: ${onlyIfTrusted})...`);
+        this.showLoading('Conectando à carteira Phantom...');
+        try {
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            console.log('Ambiente detectado:', isMobile ? 'Mobile' : 'Desktop');
+
+            if (!window.solana || !window.solana.isPhantom) {
+                console.warn('Carteira Phantom não detectada.');
+                this.hideLoading();
+                if (isMobile) {
+                    this.showToast(
+                        'Por favor, abra esta URL no navegador interno do aplicativo Phantom: https://daniloalmeid.github.io/DetHabits-Solana/',
+                        'info'
+                    );
+                    const redirectUrl = encodeURIComponent('https://daniloalmeid.github.io/DetHabits-Solana/');
+                    const deepLink = `phantom://connect?app_url=${redirectUrl}&dapp_name=DetHabits`;
+                    console.log('Redirecionando para deep link:', deepLink);
+                    window.location.href = deepLink;
+                    await new Promise(resolve => setTimeout(resolve, 3000));
+                    if (window.solana && window.solana.isPhantom) {
+                        console.log('Phantom detectado após redirecionamento, tentando conectar...');
+                        await this.connectWallet(onlyIfTrusted);
+                    } else {
+                        this.showToast(
+                            'Não foi possível detectar a carteira Phantom. Certifique-se de estar usando o navegador interno do Phantom.',
+                            'error'
+                        );
+                    }
+                } else {
+                    this.showToast(
+                        'A extensão Phantom não foi encontrada. Por favor, instale a extensão no seu navegador.',
+                        'error'
+                    );
+                }
+                return;
+            }
+
+            console.log('Conectando com a carteira Phantom...');
+            const response = await window.solana.connect({ onlyIfTrusted });
+            this.wallet = response.publicKey.toString();
+            console.log('Carteira conectada com sucesso:', this.wallet);
+            this.showToast('Carteira Phantom conectada com sucesso!', 'success');
+
+            const homePage = document.getElementById('home-page');
+            if (homePage) homePage.style.display = 'none';
+            const navbar = document.getElementById('navbar');
+            if (navbar) navbar.style.display = 'block';
+            // Carregar dados do usuário para a nova carteira
+            this.loadUserData();
+            // Re-selecionar missões para garantir sincronia
+            this.selectDailyMissions();
+            // Carregar missões na UI
+            this.loadMissions();
+            this.navigateTo('missions');
+            this.updateWalletDisplay();
+            this.updateUI();
+            this.initStaking();
+        } catch (error) {
+            console.error('Erro ao conectar carteira:', error);
+            if (error.code === 4001) {
+                this.showToast('Você rejeitou a conexão com a carteira.', 'error');
+            } else {
+                this.showToast(
+                    'Erro ao conectar a carteira. No celular, abra esta URL no navegador interno do Phantom: https://daniloalmeid.github.io/DetHabits-Solana/',
+                    'error'
+                );
+            }
+        } finally {
+            this.hideLoading();
+        }
+    }
+
+    // Funções inalteradas (mantidas para completude)
     initStaking() {
         console.log('Inicializando funcionalidades de staking...');
         try {
@@ -74,9 +424,6 @@ class DetHabitsApp {
         }
     }
 
-    /**
-     * Atualiza os rendimentos acumulados desde a última atualização.
-     */
     updateYieldsSinceLastUpdate() {
         console.log('Atualizando rendimentos desde a última atualização');
         try {
@@ -122,9 +469,6 @@ class DetHabitsApp {
         }
     }
 
-    /**
-     * Atualiza os rendimentos em intervalos regulares.
-     */
     updateYields() {
         console.log('Atualizando rendimentos');
         try {
@@ -181,9 +525,6 @@ class DetHabitsApp {
         }
     }
 
-    /**
-     * Atualiza a interface com os rendimentos em tempo real.
-     */
     updateYieldsUI() {
         console.log('Atualizando UI dos rendimentos em tempo real');
         try {
@@ -218,9 +559,6 @@ class DetHabitsApp {
         }
     }
 
-    /**
-     * Transfere rendimentos fracionários para os saldos.
-     */
     transferFractionalYields() {
         console.log('Transferindo rendimentos fracionários para saldos');
         try {
@@ -250,11 +588,6 @@ class DetHabitsApp {
         }
     }
 
-    /**
-     * Realiza um stake voluntário.
-     * @param {number} amount - Quantidade a ser staked.
-     * @returns {number} - Quantidade staked.
-     */
     stakeVoluntary(amount) {
         console.log('Tentando realizar stake voluntário:', amount);
         try {
@@ -288,11 +621,6 @@ class DetHabitsApp {
         }
     }
 
-    /**
-     * Retira parcialmente do stake voluntário.
-     * @param {number} amount - Quantidade a ser retirada.
-     * @returns {number} - Quantidade retirada, incluindo rendimentos.
-     */
     unstakeVoluntaryPartial(amount) {
         console.log('Tentando retirar parcialmente do stake voluntário:', amount);
         try {
@@ -327,10 +655,6 @@ class DetHabitsApp {
         }
     }
 
-    /**
-     * Retira o máximo do stake obrigatório.
-     * @returns {number} - Quantidade retirada, incluindo rendimentos.
-     */
     withdrawMaxObligatory() {
         console.log('Tentando retirar máximo do stake obrigatório');
         try {
@@ -362,10 +686,6 @@ class DetHabitsApp {
         }
     }
 
-    /**
-     * Retira o máximo do stake voluntário.
-     * @returns {number} - Quantidade retirada, incluindo rendimentos.
-     */
     withdrawMaxVoluntary() {
         console.log('Tentando retirar máximo do stake voluntário');
         try {
@@ -391,167 +711,86 @@ class DetHabitsApp {
         }
     }
 
-    /**
-     * Atualiza o temporizador de bloqueio do stake.
-     */
     updateStakeLockTimer() {
-        try {
-            const stakeTimeLeftElement = document.getElementById('stake-time-left');
-            if (!stakeTimeLeftElement) {
-                console.warn('Elemento stake-time-left não encontrado');
-                return;
-            }
-            if (!this.userData.stakeLockEnd) {
-                stakeTimeLeftElement.textContent = 'Nenhum stake bloqueado';
-                return;
-            }
-            const now = new Date();
-            const lockEnd = new Date(this.userData.stakeLockEnd);
-            const diff = lockEnd - now;
-            if (diff <= 0) {
-                stakeTimeLeftElement.textContent = 'Desbloqueado';
-            } else {
-                const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
-                stakeTimeLeftElement.textContent = `Bloqueado por mais ${days} dia${days > 1 ? 's' : ''}`;
-            }
-        } catch (error) {
-            console.error('Erro ao atualizar temporizador de stake:', error);
-            this.showToast('Erro ao atualizar temporizador de stake.', 'error');
+        const stakeTimeLeftElement = document.getElementById('stake-time-left');
+        if (!stakeTimeLeftElement) {
+            console.warn('Elemento stake-time-left não encontrado');
+            return;
+        }
+        if (!this.userData.stakeLockEnd) {
+            stakeTimeLeftElement.textContent = 'Nenhum stake bloqueado';
+            return;
+        }
+        const now = new Date();
+        const lockEnd = new Date(this.userData.stakeLockEnd);
+        const diff = lockEnd - now;
+        if (diff <= 0) {
+            stakeTimeLeftElement.textContent = 'Desbloqueado';
+        } else {
+            const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
+            stakeTimeLeftElement.textContent = `Bloqueado por mais ${days} dia${days > 1 ? 's' : ''}`;
         }
     }
 
-    /**
-     * Conecta à carteira Phantom.
-     * @param {boolean} onlyIfTrusted - Tenta conectar apenas se já confiável.
-     * @async
-     */
-    async connectWallet(onlyIfTrusted = false) {
-        console.log(`Tentando conectar carteira (onlyIfTrusted: ${onlyIfTrusted})...`);
-        this.showLoading('Conectando à carteira Phantom...');
-        try {
-            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-            console.log('Ambiente detectado:', isMobile ? 'Mobile' : 'Desktop');
-
-            if (!window.solana?.isPhantom) {
-                console.warn('Carteira Phantom não detectada.');
-                this.hideLoading();
-                this.showToast(
-                    isMobile
-                        ? 'Por favor, abra esta URL no navegador interno do aplicativo Phantom: https://daniloalmeid.github.io/DetHabits-Solana/'
-                        : 'A extensão Phantom não foi encontrada. Por favor, instale a extensão no seu navegador.',
-                    'error'
-                );
-                return;
-            }
-
-            console.log('Conectando com a carteira Phantom...');
-            const response = await window.solana.connect({ onlyIfTrusted });
-            const newWallet = response.publicKey.toString();
-            if (this.wallet !== newWallet) {
-                console.log('Nova carteira detectada, reinicializando dados...');
-                this.wallet = newWallet;
-                this.loadUserData();
-                this.selectDailyMissions(true);
-                this.loadMissions();
-            }
-            console.log('Carteira conectada com sucesso:', this.wallet);
-            this.showToast('Carteira Phantom conectada com sucesso!', 'success');
-
-            const homePage = document.getElementById('home-page');
-            if (homePage) homePage.style.display = 'none';
-            const navbar = document.getElementById('navbar');
-            if (navbar) navbar.style.display = 'block';
-            this.navigateTo('missions');
-            this.updateWalletDisplay();
-            this.updateUI();
-            this.initStaking();
-        } catch (error) {
-            console.error('Erro ao conectar carteira:', error);
-            this.showToast(
-                error.code === 4001
-                    ? 'Você rejeitou a conexão com a carteira.'
-                    : 'Erro ao conectar a carteira. Tente novamente ou verifique o console.',
-                'error'
-            );
-        } finally {
-            this.hideLoading();
-        }
-    }
-
-    /**
-     * Desconecta a carteira Phantom.
-     */
     disconnectWallet() {
         console.log('Desconectando carteira...');
-        try {
-            if (window.solana?.isPhantom) {
+        if (window.solana && window.solana.isPhantom) {
+            try {
                 window.solana.disconnect();
                 console.log('Carteira desconectada via Phantom API');
+            } catch (error) {
+                console.error('Erro ao desconectar carteira:', error);
             }
-            this.saveUserData();
-            this.wallet = null;
-            this.userData = {
-                totalBalance: 294,
-                stakeBalance: 0,
-                voluntaryStakeBalance: 0,
-                fractionalYieldObligatory: 0,
-                fractionalYieldVoluntary: 0,
-                dailyYieldObligatoryAccumulated: 0,
-                dailyYieldVoluntaryAccumulated: 0,
-                lastYieldUpdateTime: Date.now(),
-                lastYieldResetDate: new Date().toDateString(),
-                spendingBalance: 0,
-                completedMissions: [],
-                transactions: [],
-                lastMissionResetDate: new Date().toDateString(),
-                dailyMissions: [],
-                fixedMissions: [],
-                stakeLockEnd: null
-            };
-            this.missions = [];
-            const homePage = document.getElementById('home-page');
-            const navbar = document.getElementById('navbar');
-            if (homePage) homePage.style.display = 'block';
-            if (navbar) navbar.style.display = 'none';
-            this.navigateTo('home');
-            this.showToast('Carteira desconectada com sucesso!', 'success');
-            this.updateUI();
-        } catch (error) {
-            console.error('Erro ao desconectar carteira:', error);
-            this.showToast('Erro ao desconectar carteira.', 'error');
         }
+        this.saveUserData();
+        this.wallet = null;
+        this.userData = {
+            totalBalance: 294,
+            stakeBalance: 0,
+            voluntaryStakeBalance: 0,
+            fractionalYieldObligatory: 0,
+            fractionalYieldVoluntary: 0,
+            dailyYieldObligatoryAccumulated: 0,
+            dailyYieldVoluntaryAccumulated: 0,
+            lastYieldUpdateTime: Date.now(),
+            lastYieldResetDate: new Date().toDateString(),
+            spendingBalance: 0,
+            completedMissions: [],
+            transactions: [],
+            lastMissionResetDate: Date.now(),
+            dailyMissions: [],
+            fixedMissions: [],
+            stakeLockEnd: null
+        };
+        this.missions = [];
+        const homePage = document.getElementById('home-page');
+        const navbar = document.getElementById('navbar');
+        if (homePage) homePage.style.display = 'block';
+        if (navbar) navbar.style.display = 'none';
+        this.navigateTo('home');
+        this.showToast('Carteira desconectada com sucesso!', 'success');
+        this.updateUI();
     }
 
-    /**
-     * Atualiza a exibição do endereço da carteira na interface.
-     */
     updateWalletDisplay() {
-        try {
-            if (!this.wallet) {
-                console.log('Nenhuma carteira conectada, pulando atualização de display');
-                return;
-            }
-            console.log('Atualizando display da carteira:', this.wallet);
-            const navbar = document.getElementById('navbar');
-            if (navbar) navbar.style.display = 'block';
-            const walletAddressElement = document.getElementById('wallet-address');
-            if (walletAddressElement) {
-                walletAddressElement.textContent = `${this.wallet.substring(0, 4)}...${this.wallet.substring(this.wallet.length - 4)}`;
-            }
-            const walletAddressFullElement = document.getElementById('wallet-address-full');
-            if (walletAddressFullElement) {
-                walletAddressFullElement.textContent = this.wallet;
-            }
-        } catch (error) {
-            console.error('Erro ao atualizar display da carteira:', error);
-            this.showToast('Erro ao atualizar exibição da carteira.', 'error');
+        if (!this.wallet) {
+            console.log('Nenhuma carteira conectada, pulando atualização de display');
+            return;
+        }
+        console.log('Atualizando display da carteira:', this.wallet);
+        const navbar = document.getElementById('navbar');
+        if (navbar) navbar.style.display = 'block';
+        const walletAddressElement = document.getElementById('wallet-address');
+        if (walletAddressElement) {
+            walletAddressElement.textContent =
+                `${this.wallet.substring(0, 4)}...${this.wallet.substring(this.wallet.length - 4)}`;
+        }
+        const walletAddressFullElement = document.getElementById('wallet-address-full');
+        if (walletAddressFullElement) {
+            walletAddressFullElement.textContent = this.wallet;
         }
     }
 
-    /**
-     * Carrega todas as missões do arquivo missions.json.
-     * @async
-     */
     async loadAllMissions() {
         console.log('Carregando missões do missions.json...');
         try {
@@ -625,10 +864,6 @@ class DetHabitsApp {
         }
     }
 
-    /**
-     * Detecta alterações nas missões fixas.
-     * @param {Array} newFixedMissions - Novas missões fixas.
-     */
     detectFixedMissionChanges(newFixedMissions) {
         console.log('Detectando alterações nas missões fixas...');
         try {
@@ -670,400 +905,47 @@ class DetHabitsApp {
         }
     }
 
-    /**
-     * Seleciona missões diárias.
-     * @param {boolean} forceReset - Força o reset das missões.
-     */
-    selectDailyMissions(forceReset = false) {
-        console.log('Selecionando missões diárias...');
-        try {
-            const today = new Date().toDateString();
-            if (forceReset || this.userData.dailyMissions.length === 0 || this.userData.lastMissionResetDate !== today) {
-                console.log('Forçando reset ou novo dia detectado, selecionando novas missões diárias');
-                if (this.allMissions.length === 0) {
-                    console.warn('Nenhuma missão diária disponível em allMissions');
-                    this.showToast('Nenhuma missão diária disponível. Tente novamente mais tarde.', 'error');
-                    return;
-                }
-                this.userData.completedMissions = this.userData.completedMissions.filter(cm => 
-                    this.fixedMissions.some(fm => fm.id === cm.id)
-                );
-                const shuffledMissions = [...this.allMissions].sort(() => Math.random() - 0.5);
-                this.missions = shuffledMissions.slice(0, 5).map(mission => ({
-                    ...mission,
-                    reward: this.applyVipBonus(mission.reward),
-                    completed: false
-                }));
-                this.userData.dailyMissions = this.missions;
-                this.userData.lastMissionResetDate = today;
-                this.saveUserData();
-                console.log('Novas missões diárias selecionadas:', this.missions);
-                this.showToast('Novas missões diárias disponíveis!', 'success');
-                this.nextMissionReset = new Date();
-                this.nextMissionReset.setDate(this.nextMissionReset.getDate() + 1);
-                this.nextMissionReset.setHours(0, 0, 0, 0);
-                console.log('Próximo reset de missões:', this.nextMissionReset);
-            } else {
-                console.log('Missões diárias do dia já carregadas:', this.userData.dailyMissions);
-                this.missions = this.userData.dailyMissions.map(mission => ({
-                    ...mission,
-                    completed: this.userData.completedMissions.some(cm => cm.id === mission.id)
-                }));
-            }
-        } catch (error) {
-            console.error('Erro ao selecionar missões diárias:', error);
-            this.showToast('Erro ao selecionar missões diárias.', 'error');
-        }
-    }
-
-    /**
-     * Aplica bônus VIP às recompensas de missões.
-     * @param {number} reward - Recompensa base.
-     * @returns {number} - Recompensa com bônus aplicado.
-     */
     applyVipBonus(reward) {
-        try {
-            const totalStaked = (this.userData.stakeBalance || 0) + (this.userData.voluntaryStakeBalance || 0);
-            let bonus = 1;
-            if (totalStaked >= 500 && totalStaked <= 4999) bonus = 1.05;
-            else if (totalStaked >= 5000 && totalStaked <= 49999) bonus = 1.15;
-            else if (totalStaked >= 50000 && totalStaked <= 100000) bonus = 1.25;
-            return Math.ceil(reward * bonus);
-        } catch (error) {
-            console.error('Erro ao aplicar bônus VIP:', error);
-            return reward;
-        }
+        const totalStaked = (this.userData.stakeBalance || 0) + (this.userData.voluntaryStakeBalance || 0);
+        let bonus = 1;
+        if (totalStaked >= 500 && totalStaked <= 4999) bonus = 1.05;
+        else if (totalStaked >= 5000 && totalStaked <= 49999) bonus = 1.15;
+        else if (totalStaked >= 50000 && totalStaked <= 100000) bonus = 1.25;
+        return Math.ceil(reward * bonus);
     }
 
-    /**
-     * Inicia o temporizador de reset das missões diárias.
-     */
-    startMissionTimer() {
-        console.log('Iniciando temporizador de missões');
-        try {
-            if (!this.nextMissionReset) {
-                this.nextMissionReset = new Date();
-                this.nextMissionReset.setDate(this.nextMissionReset.getDate() + 1);
-                this.nextMissionReset.setHours(0, 0, 0, 0);
-                console.log('nextMissionReset inicializado:', this.nextMissionReset);
-                this.saveUserData();
-            }
-
-            const updateTimer = () => {
-                try {
-                    const now = new Date();
-                    const diff = this.nextMissionReset - now;
-
-                    if (diff <= 0) {
-                        console.log('Resetando missões diárias...');
-                        this.userData.lastMissionResetDate = new Date().toDateString();
-                        this.selectDailyMissions(true);
-                        this.loadMissions();
-                        this.updateMissionProgress();
-                        this.nextMissionReset = new Date();
-                        this.nextMissionReset.setDate(this.nextMissionReset.getDate() + 1);
-                        this.nextMissionReset.setHours(0, 0, 0, 0);
-                        console.log('Novo próximo reset:', this.nextMissionReset);
-                        this.saveUserData();
-                        this.showToast('Missões diárias resetadas com sucesso!', 'success');
-                        return;
-                    }
-
-                    const hours = Math.floor(diff / (1000 * 60 * 60));
-                    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-                    const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-                    const missionTimer = document.getElementById('mission-timer');
-                    if (missionTimer) {
-                        missionTimer.textContent = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-                    }
-                } catch (error) {
-                    console.error('Erro ao atualizar temporizador de missões:', error);
-                    this.showToast('Erro ao atualizar temporizador de missões.', 'error');
-                }
-            };
-
-            updateTimer();
-            setInterval(updateTimer, 1000);
-        } catch (error) {
-            console.error('Erro ao iniciar temporizador de missões:', error);
-            this.showToast('Erro ao iniciar temporizador de missões.', 'error');
-        }
-    }
-
-    /**
-     * Carrega as missões na interface.
-     */
-    loadMissions() {
-        console.log('Carregando missões na UI...');
-        try {
-            const missionsGrid = document.getElementById('missions-grid');
-            const fixedMissionsGrid = document.getElementById('fixed-missions-grid');
-            if (!missionsGrid || !fixedMissionsGrid) {
-                console.warn('Elementos missions-grid ou fixed-missions-grid não encontrados');
-                return;
-            }
-
-            missionsGrid.innerHTML = '';
-            this.missions.forEach(mission => {
-                const isCompleted = this.userData.completedMissions.some(cm => cm.id === mission.id);
-                const missionCard = document.createElement('div');
-                missionCard.className = `mission-card ${isCompleted ? 'completed' : ''}`;
-                missionCard.innerHTML = `
-                    <div class="mission-header">
-                        <span class="mission-icon">${mission.icon || '🏆'}</span>
-                        <span class="mission-reward">+${mission.reward} DET</span>
-                    </div>
-                    <h3 class="mission-title">${mission.title}</h3>
-                    <p class="mission-description">${mission.description}</p>
-                    ${mission.link ? `<a href="${mission.link}" class="mission-link" target="_blank">Acesse aqui</a>` : ''}
-                    <button class="mission-button ${isCompleted ? 'completed' : 'pending'}" data-mission-id="${mission.id}" ${isCompleted ? 'disabled' : ''}>
-                        ${isCompleted ? 'Concluída' : 'Enviar Prova'}
-                    </button>
-                `;
-                missionsGrid.appendChild(missionCard);
-            });
-
-            fixedMissionsGrid.innerHTML = '';
-            this.fixedMissions.forEach(mission => {
-                const isCompleted = this.userData.completedMissions.some(cm => cm.id === mission.id);
-                const missionCard = document.createElement('div');
-                missionCard.className = `mission-card ${isCompleted ? 'completed' : ''}`;
-                missionCard.innerHTML = `
-                    <div class="mission-header">
-                        <span class="mission-icon">${mission.icon || '🏆'}</span>
-                        <span class="mission-reward">+${mission.reward} DET</span>
-                    </div>
-                    <h3 class="mission-title">${mission.title}</h3>
-                    <p class="mission-description">${mission.description}</p>
-                    ${mission.link ? `<a href="${mission.link}" class="mission-link" target="_blank">Acesse aqui</a>` : ''}
-                    <button class="mission-button ${isCompleted ? 'completed' : 'pending'}" data-mission-id="${mission.id}" ${isCompleted ? 'disabled' : ''}>
-                        ${isCompleted ? 'Concluída' : 'Enviar Prova'}
-                    </button>
-                `;
-                fixedMissionsGrid.appendChild(missionCard);
-            });
-        } catch (error) {
-            console.error('Erro ao carregar missões na UI:', error);
-            this.showToast('Erro ao carregar missões na interface.', 'error');
-        }
-    }
-
-    /**
-     * Atualiza o progresso das missões na interface.
-     */
     updateMissionProgress() {
-        try {
-            const completedCount = this.userData.completedMissions.filter(cm =>
-                this.missions.some(m => m.id === cm.id)
-            ).length;
-            const progress = this.missions.length > 0 ? (completedCount / this.missions.length) * 100 : 0;
-            const progressBar = document.getElementById('daily-progress');
-            const completedMissions = document.getElementById('completed-missions');
-            if (progressBar) progressBar.style.width = `${progress}%`;
-            if (completedMissions) completedMissions.textContent = `${completedCount}/${this.missions.length}`;
-        } catch (error) {
-            console.error('Erro ao atualizar progresso das missões:', error);
-            this.showToast('Erro ao atualizar progresso das missões.', 'error');
-        }
+        const completedCount = this.userData.completedMissions.filter(cm =>
+            this.missions.some(m => m.id === cm.id)
+        ).length;
+        const progress = this.missions.length > 0 ? (completedCount / this.missions.length) * 100 : 0;
+        const progressBar = document.getElementById('daily-progress');
+        const completedMissions = document.getElementById('completed-missions');
+        if (progressBar) progressBar.style.width = `${progress}%`;
+        if (completedMissions) completedMissions.textContent = `${completedCount}/${this.missions.length}`;
     }
 
-    /**
-     * Abre o modal para envio de prova de missão.
-     * @param {string} missionId - ID da missão.
-     */
-    openMissionModal(missionId) {
-        try {
-            const mission = this.missions.find(m => m.id === missionId) || this.fixedMissions.find(m => m.id === missionId);
-            if (!mission) {
-                console.error('Missão não encontrada:', missionId);
-                this.showToast('Missão não encontrada.', 'error');
-                return;
-            }
-            this.currentMission = mission;
-            const modal = document.getElementById('photo-modal');
-            const modalTitle = document.getElementById('modal-mission-title');
-            if (modal && modalTitle) {
-                modal.classList.add('active');
-                modalTitle.textContent = mission.title;
-            } else {
-                console.warn('Elementos photo-modal ou modal-mission-title não encontrados');
-                this.showToast('Erro ao abrir modal de missão.', 'error');
-            }
-        } catch (error) {
-            console.error('Erro ao abrir modal de missão:', error);
-            this.showToast('Erro ao abrir modal de missão.', 'error');
-        }
-    }
-
-    /**
-     * Submete uma missão completada.
-     */
-    submitMission() {
-        try {
-            if (!this.currentMission) {
-                console.error('Nenhuma missão selecionada para envio');
-                this.showToast('Erro: Nenhuma missão selecionada.', 'error');
-                return;
-            }
-            console.log('Enviando missão:', this.currentMission.id);
-            const reward = this.currentMission.reward;
-            const totalBalanceReward = reward * 0.8;
-            const stakeBalanceReward = reward * 0.1;
-            const spendingBalanceReward = reward * 0.1;
-
-            this.userData.totalBalance = (this.userData.totalBalance || 0) + totalBalanceReward;
-            this.userData.stakeBalance = (this.userData.stakeBalance || 0) + stakeBalanceReward;
-            this.userData.spendingBalance = (this.userData.spendingBalance || 0) + spendingBalanceReward;
-
-            if (!this.userData.stakeLockEnd && stakeBalanceReward > 0) {
-                const lockEnd = new Date();
-                lockEnd.setDate(lockEnd.getDate() + 90);
-                this.userData.stakeLockEnd = lockEnd.toISOString();
-            }
-
-            this.userData.completedMissions.push({ id: this.currentMission.id, completedAt: new Date().toISOString() });
-            this.addTransaction('mission', `Missão Concluída: ${this.currentMission.title} (+${reward} DET: 80% Total, 10% Stake, 10% Gastos)`, reward);
-            this.saveUserData();
-            this.loadMissions();
-            this.updateMissionProgress();
-            this.updateUI();
-            this.closeModal();
-            this.showToast(
-                `Missão "${this.currentMission.title}" concluída! Você ganhou ${totalBalanceReward.toFixed(5)} DET no Saldo Total, ${stakeBalanceReward.toFixed(5)} DET no Stake Obrigatório e ${spendingBalanceReward.toFixed(5)} DET no Saldo de Gastos!`,
-                'success'
-            );
-        } catch (error) {
-            console.error('Erro ao enviar missão:', error);
-            this.showToast('Erro ao enviar missão.', 'error');
-        }
-    }
-
-    /**
-     * Carrega os dados do usuário do localStorage.
-     */
-    loadUserData() {
-        console.log('Carregando dados do usuário do localStorage...');
-        try {
-            if (!this.wallet) {
-                console.log('Nenhuma carteira conectada, usando dados padrão');
-                this.userData = {
-                    totalBalance: 294,
-                    stakeBalance: 0,
-                    voluntaryStakeBalance: 0,
-                    fractionalYieldObligatory: 0,
-                    fractionalYieldVoluntary: 0,
-                    dailyYieldObligatoryAccumulated: 0,
-                    dailyYieldVoluntaryAccumulated: 0,
-                    lastYieldUpdateTime: Date.now(),
-                    lastYieldResetDate: new Date().toDateString(),
-                    spendingBalance: 0,
-                    completedMissions: [],
-                    transactions: [],
-                    lastMissionResetDate: new Date().toDateString(),
-                    dailyMissions: [],
-                    fixedMissions: [],
-                    stakeLockEnd: null
-                };
-                this.missions = [];
-                this.selectDailyMissions(true);
-                return;
-            }
-
-            const savedData = localStorage.getItem(`dethabits_${this.wallet}`);
-            if (savedData) {
-                const parsedData = JSON.parse(savedData);
-                this.userData = {
-                    totalBalance: typeof parsedData.totalBalance === 'number' ? parsedData.totalBalance : 294,
-                    stakeBalance: typeof parsedData.stakeBalance === 'number' ? parsedData.stakeBalance : 0,
-                    voluntaryStakeBalance: typeof parsedData.voluntaryStakeBalance === 'number' ? parsedData.voluntaryStakeBalance : 0,
-                    fractionalYieldObligatory: typeof parsedData.fractionalYieldObligatory === 'number' ? parsedData.fractionalYieldObligatory : 0,
-                    fractionalYieldVoluntary: typeof parsedData.fractionalYieldVoluntary === 'number' ? parsedData.fractionalYieldVoluntary : 0,
-                    dailyYieldObligatoryAccumulated: typeof parsedData.dailyYieldObligatoryAccumulated === 'number' ? parsedData.dailyYieldObligatoryAccumulated : 0,
-                    dailyYieldVoluntaryAccumulated: typeof parsedData.dailyYieldVoluntaryAccumulated === 'number' ? parsedData.dailyYieldVoluntaryAccumulated : 0,
-                    lastYieldUpdateTime: parsedData.lastYieldUpdateTime || Date.now(),
-                    spendingBalance: typeof parsedData.spendingBalance === 'number' ? parsedData.spendingBalance : 0,
-                    completedMissions: Array.isArray(parsedData.completedMissions) ? parsedData.completedMissions : [],
-                    transactions: Array.isArray(parsedData.transactions) ? parsedData.transactions : [],
-                    dailyMissions: Array.isArray(parsedData.dailyMissions) ? parsedData.dailyMissions : [],
-                    fixedMissions: Array.isArray(parsedData.fixedMissions) ? parsedData.fixedMissions : [],
-                    stakeLockEnd: parsedData.stakeLockEnd || null,
-                    lastYieldResetDate: parsedData.lastYieldResetDate || new Date().toDateString(),
-                    lastMissionResetDate: parsedData.lastMissionResetDate || new Date().toDateString()
-                };
-                this.missions = this.userData.dailyMissions;
-                console.log('Dados do usuário carregados:', this.userData);
-            } else {
-                console.log('Nenhum dado encontrado para a carteira, inicializando missões...');
-                this.userData.completedMissions = [];
-                this.userData.dailyMissions = [];
-                this.userData.lastMissionResetDate = new Date().toDateString();
-                this.missions = [];
-                this.selectDailyMissions(true);
-            }
-            this.saveUserData();
-        } catch (error) {
-            console.error('Erro ao carregar dados do usuário:', error);
-            this.showToast('Erro ao carregar dados do usuário. Usando valores padrão.', 'error');
-            this.userData = {
-                totalBalance: 294,
-                stakeBalance: 0,
-                voluntaryStakeBalance: 0,
-                fractionalYieldObligatory: 0,
-                fractionalYieldVoluntary: 0,
-                dailyYieldObligatoryAccumulated: 0,
-                dailyYieldVoluntaryAccumulated: 0,
-                lastYieldUpdateTime: Date.now(),
-                lastYieldResetDate: new Date().toDateString(),
-                spendingBalance: 0,
-                completedMissions: [],
-                transactions: [],
-                lastMissionResetDate: new Date().toDateString(),
-                dailyMissions: [],
-                fixedMissions: [],
-                stakeLockEnd: null
-            };
-            this.missions = [];
-            this.selectDailyMissions(true);
-        }
-    }
-
-    /**
-     * Salva os dados do usuário no localStorage.
-     */
     saveUserData() {
         console.log('Salvando dados do usuário no localStorage...');
         try {
-            if (this.wallet) {
-                localStorage.setItem(`dethabits_${this.wallet}`, JSON.stringify(this.userData));
-                console.log('Dados do usuário salvos com sucesso');
-            }
+            localStorage.setItem(`dethabits_${this.wallet || 'default'}`, JSON.stringify(this.userData));
+            console.log('Dados do usuário salvos com sucesso');
         } catch (error) {
             console.error('Erro ao salvar dados do usuário:', error);
             this.showToast('Erro ao salvar dados do usuário.', 'error');
         }
     }
 
-    /**
-     * Inicia o intervalo de backup automático.
-     */
     startBackupInterval() {
         console.log('Iniciando intervalo de backup automático');
-        try {
-            setInterval(() => {
-                if (this.wallet) {
-                    this.saveUserData();
-                    console.log('Backup automático realizado');
-                }
-            }, 5 * 60 * 1000);
-        } catch (error) {
-            console.error('Erro ao iniciar intervalo de backup:', error);
-            this.showToast('Erro ao configurar backup automático.', 'error');
-        }
+        setInterval(() => {
+            if (this.wallet) {
+                this.saveUserData();
+                console.log('Backup automático realizado');
+            }
+        }, 5 * 60 * 1000);
     }
 
-    /**
-     * Atualiza a interface do usuário.
-     */
     updateUI() {
         console.log('Atualizando UI...');
         try {
@@ -1079,83 +961,54 @@ class DetHabitsApp {
         }
     }
 
-    /**
-     * Atualiza a página da carteira.
-     */
     updateWalletPage() {
-        try {
-            const totalBalanceElement = document.getElementById('total-balance');
-            const stakeBalanceElement = document.getElementById('stake-balance');
-            const voluntaryStakeBalanceElement = document.getElementById('voluntary-stake-balance');
-            const spendingBalanceElement = document.getElementById('spending-balance');
-            const withdrawBtn = document.getElementById('withdraw-btn');
-            const withdrawMaxObligatoryBtn = document.getElementById('withdraw-max-obligatory-btn');
-            const withdrawMaxVoluntaryBtn = document.getElementById('withdraw-max-voluntary-btn');
+        const totalBalanceElement = document.getElementById('total-balance');
+        const stakeBalanceElement = document.getElementById('stake-balance');
+        const voluntaryStakeBalanceElement = document.getElementById('voluntary-stake-balance');
+        const spendingBalanceElement = document.getElementById('spending-balance');
+        const withdrawBtn = document.getElementById('withdraw-btn');
+        const withdrawMaxObligatoryBtn = document.getElementById('withdraw-max-obligatory-btn');
+        const withdrawMaxVoluntaryBtn = document.getElementById('withdraw-max-voluntary-btn');
 
-            if (totalBalanceElement) totalBalanceElement.textContent = (this.userData.totalBalance || 0).toFixed(5);
-            if (stakeBalanceElement) stakeBalanceElement.textContent = (this.userData.stakeBalance || 0).toFixed(5);
-            if (voluntaryStakeBalanceElement) voluntaryStakeBalanceElement.textContent = (this.userData.voluntaryStakeBalance || 0).toFixed(5);
-            if (spendingBalanceElement) spendingBalanceElement.textContent = (this.userData.spendingBalance || 0).toFixed(5);
-            if (withdrawBtn) withdrawBtn.disabled = (this.userData.totalBalance || 0) < 800;
-            if (withdrawMaxObligatoryBtn) {
-                const now = new Date();
-                withdrawMaxObligatoryBtn.disabled = !this.userData.stakeBalance || (this.userData.stakeLockEnd && new Date(this.userData.stakeLockEnd) > now);
-            }
-            if (withdrawMaxVoluntaryBtn) withdrawMaxVoluntaryBtn.disabled = !this.userData.voluntaryStakeBalance;
-        } catch (error) {
-            console.error('Erro ao atualizar página da carteira:', error);
-            this.showToast('Erro ao atualizar página da carteira.', 'error');
+        if (totalBalanceElement) totalBalanceElement.textContent = (this.userData.totalBalance || 0).toFixed(5);
+        if (stakeBalanceElement) stakeBalanceElement.textContent = (this.userData.stakeBalance || 0).toFixed(5);
+        if (voluntaryStakeBalanceElement) voluntaryStakeBalanceElement.textContent = (this.userData.voluntaryStakeBalance || 0).toFixed(5);
+        if (spendingBalanceElement) spendingBalanceElement.textContent = (this.userData.spendingBalance || 0).toFixed(5);
+        if (withdrawBtn) withdrawBtn.disabled = (this.userData.totalBalance || 0) < 800;
+        if (withdrawMaxObligatoryBtn) {
+            const now = new Date();
+            withdrawMaxObligatoryBtn.disabled = !this.userData.stakeBalance || (this.userData.stakeLockEnd && new Date(this.userData.stakeLockEnd) > now);
         }
+        if (withdrawMaxVoluntaryBtn) withdrawMaxVoluntaryBtn.disabled = !this.userData.voluntaryStakeBalance;
     }
 
-    /**
-     * Atualiza a página da loja.
-     */
     updateShopPage() {
-        try {
-            const shopBalanceElement = document.getElementById('shop-balance');
-            if (shopBalanceElement) shopBalanceElement.textContent = (this.userData.spendingBalance || 0).toFixed(5);
-        } catch (error) {
-            console.error('Erro ao atualizar página da loja:', error);
-            this.showToast('Erro ao atualizar página da loja.', 'error');
-        }
+        const shopBalanceElement = document.getElementById('shop-balance');
+        if (shopBalanceElement) shopBalanceElement.textContent = (this.userData.spendingBalance || 0).toFixed(5);
     }
 
-    /**
-     * Atualiza o histórico de transações.
-     */
     updateTransactionHistory() {
-        try {
-            const historyList = document.getElementById('transaction-history');
-            if (!historyList) return;
-            historyList.innerHTML = '';
-            this.userData.transactions.slice(-10).reverse().forEach(transaction => {
-                const transactionItem = document.createElement('div');
-                transactionItem.className = 'transaction-item';
-                const amountClass = transaction.amount >= 0 ? 'positive' : 'negative';
-                transactionItem.innerHTML = `
-                    <div class="transaction-info">
-                        <span class="transaction-icon">${this.getTransactionIcon(transaction.type)}</span>
-                        <div class="transaction-details">
-                            <h4>${transaction.description}</h4>
-                            <p>${new Date(transaction.timestamp).toLocaleString()}</p>
-                        </div>
+        const historyList = document.getElementById('transaction-history');
+        if (!historyList) return;
+        historyList.innerHTML = '';
+        this.userData.transactions.slice(-10).reverse().forEach(transaction => {
+            const transactionItem = document.createElement('div');
+            transactionItem.className = 'transaction-item';
+            const amountClass = transaction.amount >= 0 ? 'positive' : 'negative';
+            transactionItem.innerHTML = `
+                <div class="transaction-info">
+                    <span class="transaction-icon">${this.getTransactionIcon(transaction.type)}</span>
+                    <div class="transaction-details">
+                        <h4>${transaction.description}</h4>
+                        <p>${new Date(transaction.timestamp).toLocaleString()}</p>
                     </div>
-                    <span class="transaction-amount ${amountClass}">${transaction.amount.toFixed(5)} DET</span>
-                `;
-                historyList.appendChild(transactionItem);
-            });
-        } catch (error) {
-            console.error('Erro ao atualizar histórico de transações:', error);
-            this.showToast('Erro ao atualizar histórico de transações.', 'error');
-        }
+                </div>
+                <span class="transaction-amount ${amountClass}">${transaction.amount.toFixed(5)} DET</span>
+            `;
+            historyList.appendChild(transactionItem);
+        });
     }
 
-    /**
-     * Obtém o ícone correspondente ao tipo de transação.
-     * @param {string} type - Tipo da transação.
-     * @returns {string} - Ícone correspondente.
-     */
     getTransactionIcon(type) {
         switch (type) {
             case 'mission': return '🏆';
@@ -1167,370 +1020,305 @@ class DetHabitsApp {
         }
     }
 
-    /**
-     * Adiciona uma transação ao histórico.
-     * @param {string} type - Tipo da transação.
-     * @param {string} description - Descrição da transação.
-     * @param {number} amount - Valor da transação.
-     */
     addTransaction(type, description, amount) {
-        try {
-            this.userData.transactions.push({
-                type,
-                description,
-                amount,
-                timestamp: new Date().toISOString()
-            });
-        } catch (error) {
-            console.error('Erro ao adicionar transação:', error);
-            this.showToast('Erro ao registrar transação.', 'error');
-        }
+        this.userData.transactions.push({
+            type,
+            description,
+            amount,
+            timestamp: new Date().toISOString()
+        });
     }
 
-    /**
-     * Navega para uma página específica.
-     * @param {string} page - Nome da página.
-     */
     navigateTo(page) {
         console.log('Navegando para:', page);
-        try {
-            this.currentPage = page;
-            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-            document.querySelectorAll('.nav-button').forEach(b => b.classList.remove('active'));
-            const pageElement = document.getElementById(`${page}-page`);
-            const navButton = document.querySelector(`.nav-button[data-page="${page}"]`);
-            if (pageElement) pageElement.classList.add('active');
-            if (navButton) navButton.classList.add('active');
-            if (page === 'missions') {
-                this.loadMissions();
-                this.updateMissionProgress();
-            }
-            if (page === 'wallet') this.updateWalletPage();
-            if (page === 'shop') this.updateShopPage();
-        } catch (error) {
-            console.error('Erro ao navegar para a página:', error);
-            this.showToast('Erro ao navegar para a página.', 'error');
+        this.currentPage = page;
+        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+        document.querySelectorAll('.nav-button').forEach(b => b.classList.remove('active'));
+        const pageElement = document.getElementById(`${page}-page`);
+        const navButton = document.querySelector(`.nav-button[data-page="${page}"]`);
+        if (pageElement) pageElement.classList.add('active');
+        if (navButton) navButton.classList.add('active');
+        if (page === 'missions') {
+            this.loadMissions();
+            this.updateMissionProgress();
         }
+        if (page === 'wallet') this.updateWalletPage();
+        if (page === 'shop') this.updateShopPage();
     }
 
-    /**
-     * Exibe uma notificação toast.
-     * @param {string} message - Mensagem a ser exibida.
-     * @param {string} [type='info'] - Tipo do toast (info, success, error).
-     */
     showToast(message, type = 'info') {
-        try {
-            const toastContainer = document.getElementById('toast-container');
-            if (!toastContainer) {
-                console.warn('Elemento toast-container não encontrado');
-                return;
-            }
-            const toast = document.createElement('div');
-            toast.className = `toast ${type}`;
-            toast.textContent = message;
-            toastContainer.appendChild(toast);
-            setTimeout(() => toast.remove(), 5000);
-        } catch (error) {
-            console.error('Erro ao exibir toast:', error);
-        }
+        const toastContainer = document.getElementById('toast-container');
+        if (!toastContainer) return;
+        const toast = document.createElement('div');
+        toast.className = `toast ${type}`;
+        toast.textContent = message;
+        toastContainer.appendChild(toast);
+        setTimeout(() => toast.remove(), 5000);
     }
 
-    /**
-     * Exibe o overlay de carregamento.
-     * @param {string} message - Mensagem a ser exibida.
-     */
     showLoading(message) {
-        try {
-            const overlay = document.getElementById('loading-overlay');
-            if (overlay) {
-                const textElement = overlay.querySelector('p');
-                if (textElement) textElement.textContent = message;
-                overlay.classList.add('active');
-            }
-        } catch (error) {
-            console.error('Erro ao exibir loading:', error);
+        const overlay = document.getElementById('loading-overlay');
+        if (overlay) {
+            overlay.querySelector('p').textContent = message;
+            overlay.classList.add('active');
         }
     }
 
-    /**
-     * Oculta o overlay de carregamento.
-     */
     hideLoading() {
-        try {
-            const overlay = document.getElementById('loading-overlay');
-            if (overlay) overlay.classList.remove('active');
-        } catch (error) {
-            console.error('Erro ao ocultar loading:', error);
-        }
+        const overlay = document.getElementById('loading-overlay');
+        if (overlay) overlay.classList.remove('active');
     }
 
-    /**
-     * Fecha o modal de envio de prova.
-     */
     closeModal() {
-        try {
-            const modal = document.getElementById('photo-modal');
-            if (modal) modal.classList.remove('active');
-            const photoInput = document.getElementById('photo-input');
-            const photoPreview = document.getElementById('photo-preview');
-            if (photoInput) photoInput.value = '';
-            if (photoPreview) photoPreview.innerHTML = '';
-            this.currentMission = null;
-        } catch (error) {
-            console.error('Erro ao fechar modal:', error);
-            this.showToast('Erro ao fechar modal.', 'error');
-        }
+        const modal = document.getElementById('photo-modal');
+        if (modal) modal.classList.remove('active');
+        const photoInput = document.getElementById('photo-input');
+        const photoPreview = document.getElementById('photo-preview');
+        if (photoInput) photoInput.value = '';
+        if (photoPreview) photoPreview.innerHTML = '';
+        this.currentMission = null;
     }
 
-    /**
-     * Configura os event listeners da interface.
-     */
     setupEventListeners() {
         console.log('Configurando event listeners...');
-        try {
-            const navButtons = document.querySelectorAll('.nav-button');
-            navButtons.forEach(button => {
-                button.addEventListener('click', () => {
-                    this.navigateTo(button.dataset.page);
-                    const navLinks = document.querySelector('.nav-links');
-                    if (navLinks) navLinks.classList.remove('mobile-active');
+        document.querySelectorAll('.nav-button').forEach(button => {
+            button.addEventListener('click', () => {
+                this.navigateTo(button.dataset.page);
+                const navLinks = document.querySelector('.nav-links');
+                if (navLinks) navLinks.classList.remove('mobile-active');
+            });
+        });
+
+        const mobileMenuBtn = document.getElementById('mobile-menu-btn');
+        if (mobileMenuBtn) {
+            mobileMenuBtn.addEventListener('click', () => {
+                const navLinks = document.querySelector('.nav-links');
+                if (navLinks) navLinks.classList.toggle('mobile-active');
+            });
+        }
+
+        const connectWalletBtn = document.getElementById('connect-wallet-btn');
+        if (connectWalletBtn) {
+            connectWalletBtn.addEventListener('click', () => this.connectWallet());
+        }
+
+        const disconnectBtn = document.getElementById('disconnect-btn');
+        if (disconnectBtn) {
+            disconnectBtn.addEventListener('click', () => this.disconnectWallet());
+        }
+
+        const copyUrlBtn = document.getElementById('copy-url-btn');
+        if (copyUrlBtn) {
+            copyUrlBtn.addEventListener('click', () => {
+                const appUrl = document.getElementById('app-url');
+                if (appUrl) {
+                    navigator.clipboard.writeText(appUrl.textContent)
+                        .then(() => this.showToast('URL copiada com sucesso!', 'success'))
+                        .catch(() => this.showToast('Erro ao copiar URL.', 'error'));
+                }
+            });
+        }
+
+        const presaleBtn = document.getElementById('presale-btn');
+        if (presaleBtn) {
+            presaleBtn.addEventListener('click', () => this.navigateTo('presale'));
+        }
+
+        const copyPresaleWalletBtn = document.getElementById('copy-presale-wallet-btn');
+        if (copyPresaleWalletBtn) {
+            copyPresaleWalletBtn.addEventListener('click', () => {
+                const presaleWallet = document.getElementById('presale-wallet');
+                if (presaleWallet) {
+                    navigator.clipboard.writeText(presaleWallet.textContent)
+                        .then(() => this.showToast('Carteira de pré-venda copiada!', 'success'))
+                        .catch(() => this.showToast('Erro ao copiar carteira.', 'error'));
+                }
+            });
+        }
+
+        const solAmountInput = document.getElementById('sol-amount');
+        const detAmountInput = document.getElementById('det-amount');
+        if (solAmountInput && detAmountInput) {
+            solAmountInput.addEventListener('input', () => {
+                const sol = parseFloat(solAmountInput.value) || 0;
+                detAmountInput.value = (sol * 150 / 0.02).toFixed(5);
+            });
+        }
+
+        const buyPresaleBtn = document.getElementById('buy-presale-btn');
+        if (buyPresaleBtn) {
+            buyPresaleBtn.addEventListener('click', () => {
+                if (!detAmountInput) return;
+                const detAmount = parseFloat(detAmountInput.value);
+                if (detAmount < 500 || detAmount > 100000) {
+                    this.showToast('A quantidade deve estar entre 500 e 100.000 DET.', 'error');
+                    return;
+                }
+                this.userData.totalBalance += detAmount;
+                this.addTransaction('presale', `Compra na Pré-venda: +${detAmount.toFixed(5)} DET`, detAmount);
+                this.saveUserData();
+                this.updateUI();
+                this.showToast(`Compra de ${detAmount.toFixed(5)} DET realizada com sucesso!`, 'success');
+            });
+        }
+
+        const missionsGrid = document.getElementById('missions-grid');
+        if (missionsGrid) {
+            missionsGrid.addEventListener('click', e => {
+                if (e.target.classList.contains('mission-button') && !e.target.disabled) {
+                    this.openMissionModal(e.target.dataset.missionId);
+                }
+            });
+        }
+
+        const fixedMissionsGrid = document.getElementById('fixed-missions-grid');
+        if (fixedMissionsGrid) {
+            fixedMissionsGrid.addEventListener('click', e => {
+                if (e.target.classList.contains('mission-button') && !e.target.disabled) {
+                    this.openMissionModal(e.target.dataset.missionId);
+                }
+            });
+        }
+
+        const photoInput = document.getElementById('photo-input');
+        const photoPreview = document.getElementById('photo-preview');
+        const submitMissionBtn = document.getElementById('submit-mission-btn');
+        if (photoInput && photoPreview && submitMissionBtn) {
+            photoInput.addEventListener('change', () => {
+                if (photoInput.files && photoInput.files[0]) {
+                    const reader = new FileReader();
+                    reader.onload = e => {
+                        photoPreview.innerHTML = `<img src="${e.target.result}" alt="Preview">`;
+                        submitMissionBtn.disabled = false;
+                    };
+                    reader.readAsDataURL(photoInput.files[0]);
+                }
+            });
+        }
+
+        if (submitMissionBtn) {
+            submitMissionBtn.addEventListener('click', () => this.submitMission());
+        }
+
+        const closeModalBtn = document.getElementById('close-modal');
+        if (closeModalBtn) {
+            closeModalBtn.addEventListener('click', () => this.closeModal());
+        }
+
+        const categoryButtons = document.querySelectorAll('.category-btn');
+        categoryButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                categoryButtons.forEach(btn => btn.classList.remove('active'));
+                button.classList.add('active');
+                const category = button.dataset.category;
+                const shopItems = document.querySelectorAll('.shop-item');
+                shopItems.forEach(item => {
+                    if (category === 'all' || item.dataset.category === category) {
+                        item.style.display = 'block';
+                    } else {
+                        item.style.display = 'none';
+                    }
                 });
             });
+        });
 
-            const mobileMenuBtn = document.getElementById('mobile-menu-btn');
-            if (mobileMenuBtn) {
-                mobileMenuBtn.addEventListener('click', () => {
-                    const navLinks = document.querySelector('.nav-links');
-                    if (navLinks) navLinks.classList.toggle('mobile-active');
-                });
-            }
-
-            const connectWalletBtn = document.getElementById('connect-wallet-btn');
-            if (connectWalletBtn) {
-                connectWalletBtn.addEventListener('click', () => this.connectWallet());
-            }
-
-            const disconnectBtn = document.getElementById('disconnect-btn');
-            if (disconnectBtn) {
-                disconnectBtn.addEventListener('click', () => this.disconnectWallet());
-            }
-
-            const copyUrlBtn = document.getElementById('copy-url-btn');
-            if (copyUrlBtn) {
-                copyUrlBtn.addEventListener('click', () => {
-                    const appUrl = document.getElementById('app-url');
-                    if (appUrl) {
-                        navigator.clipboard.writeText(appUrl.textContent)
-                            .then(() => this.showToast('URL copiada com sucesso!', 'success'))
-                            .catch(() => this.showToast('Erro ao copiar URL.', 'error'));
-                    }
-                });
-            }
-
-            const presaleBtn = document.getElementById('presale-btn');
-            if (presaleBtn) {
-                presaleBtn.addEventListener('click', () => this.navigateTo('presale'));
-            }
-
-            const copyPresaleWalletBtn = document.getElementById('copy-presale-wallet-btn');
-            if (copyPresaleWalletBtn) {
-                copyPresaleWalletBtn.addEventListener('click', () => {
-                    const presaleWallet = document.getElementById('presale-wallet');
-                    if (presaleWallet) {
-                        navigator.clipboard.writeText(presaleWallet.textContent)
-                            .then(() => this.showToast('Carteira de pré-venda copiada!', 'success'))
-                            .catch(() => this.showToast('Erro ao copiar carteira.', 'error'));
-                    }
-                });
-            }
-
-            const solAmountInput = document.getElementById('sol-amount');
-            const detAmountInput = document.getElementById('det-amount');
-            if (solAmountInput && detAmountInput) {
-                solAmountInput.addEventListener('input', () => {
-                    const sol = parseFloat(solAmountInput.value) || 0;
-                    detAmountInput.value = (sol * 150 / 0.02).toFixed(5);
-                });
-            }
-
-            const buyPresaleBtn = document.getElementById('buy-presale-btn');
-            if (buyPresaleBtn) {
-                buyPresaleBtn.addEventListener('click', () => {
-                    if (!detAmountInput) return;
-                    const detAmount = parseFloat(detAmountInput.value);
-                    if (detAmount < 500 || detAmount > 100000) {
-                        this.showToast('A quantidade deve estar entre 500 e 100.000 DET.', 'error');
+        const shopGrid = document.querySelector('.shop-grid');
+        if (shopGrid) {
+            shopGrid.addEventListener('click', e => {
+                if (e.target.classList.contains('buy-btn')) {
+                    const item = e.target.closest('.shop-item');
+                    if (!item) return;
+                    const priceElement = item.querySelector('.item-price');
+                    if (!priceElement) return;
+                    const price = parseFloat(priceElement.textContent);
+                    if ((this.userData.spendingBalance || 0) < price) {
+                        this.showToast('Saldo insuficiente para comprar este item.', 'error');
                         return;
                     }
-                    this.userData.totalBalance += detAmount;
-                    this.addTransaction('presale', `Compra na Pré-venda: +${detAmount.toFixed(5)} DET`, detAmount);
+                    const itemName = item.querySelector('h4')?.textContent || 'Item';
+                    this.userData.spendingBalance -= price;
+                    this.addTransaction('purchase', `Compra: ${itemName} (-${price.toFixed(5)} DET)`, -price);
                     this.saveUserData();
                     this.updateUI();
-                    this.showToast(`Compra de ${detAmount.toFixed(5)} DET realizada com sucesso!`, 'success');
-                });
-            }
-
-            const missionsGrid = document.getElementById('missions-grid');
-            if (missionsGrid) {
-                missionsGrid.addEventListener('click', e => {
-                    if (e.target.classList.contains('mission-button') && !e.target.disabled) {
-                        this.openMissionModal(e.target.dataset.missionId);
-                    }
-                });
-            }
-
-            const fixedMissionsGrid = document.getElementById('fixed-missions-grid');
-            if (fixedMissionsGrid) {
-                fixedMissionsGrid.addEventListener('click', e => {
-                    if (e.target.classList.contains('mission-button') && !e.target.disabled) {
-                        this.openMissionModal(e.target.dataset.missionId);
-                    }
-                });
-            }
-
-            const photoInput = document.getElementById('photo-input');
-            const photoPreview = document.getElementById('photo-preview');
-            const submitMissionBtn = document.getElementById('submit-mission-btn');
-            if (photoInput && photoPreview && submitMissionBtn) {
-                photoInput.addEventListener('change', () => {
-                    if (photoInput.files && photoInput.files[0]) {
-                        const reader = new FileReader();
-                        reader.onload = e => {
-                            photoPreview.innerHTML = `<img src="${e.target.result}" alt="Preview">`;
-                            submitMissionBtn.disabled = false;
-                        };
-                        reader.readAsDataURL(photoInput.files[0]);
-                    }
-                });
-            }
-
-            if (submitMissionBtn) {
-                submitMissionBtn.addEventListener('click', () => this.submitMission());
-            }
-
-            const closeModalBtn = document.getElementById('close-modal');
-            if (closeModalBtn) {
-                closeModalBtn.addEventListener('click', () => this.closeModal());
-            }
-
-            const categoryButtons = document.querySelectorAll('.category-btn');
-            categoryButtons.forEach(button => {
-                button.addEventListener('click', () => {
-                    categoryButtons.forEach(btn => btn.classList.remove('active'));
-                    button.classList.add('active');
-                    const category = button.dataset.category;
-                    const shopItems = document.querySelectorAll('.shop-item');
-                    shopItems.forEach(item => {
-                        if (category === 'all' || item.dataset.category === category) {
-                            item.style.display = 'block';
-                        } else {
-                            item.style.display = 'none';
-                        }
-                    });
-                });
+                    this.showToast('Item comprado com sucesso!', 'success');
+                }
             });
+        }
 
-            const shopGrid = document.querySelector('.shop-grid');
-            if (shopGrid) {
-                shopGrid.addEventListener('click', e => {
-                    if (e.target.classList.contains('buy-btn')) {
-                        const item = e.target.closest('.shop-item');
-                        if (!item) return;
-                        const priceElement = item.querySelector('.item-price');
-                        if (!priceElement) return;
-                        const price = parseFloat(priceElement.textContent);
-                        if ((this.userData.spendingBalance || 0) < price) {
-                            this.showToast('Saldo insuficiente para comprar este item.', 'error');
-                            return;
-                        }
-                        const itemName = item.querySelector('h4')?.textContent || 'Item';
-                        this.userData.spendingBalance -= price;
-                        this.addTransaction('purchase', `Compra: ${itemName} (-${price.toFixed(5)} DET)`, -price);
-                        this.saveUserData();
-                        this.updateUI();
-                        this.showToast('Item comprado com sucesso!', 'success');
-                    }
-                });
-            }
+        const withdrawBtn = document.getElementById('withdraw-btn');
+        if (withdrawBtn) {
+            withdrawBtn.addEventListener('click', () => {
+                if ((this.userData.totalBalance || 0) < 800) {
+                    this.showToast('Mínimo de 800 DET necessário para saque.', 'error');
+                    return;
+                }
+                const amount = this.userData.totalBalance;
+                this.userData.totalBalance = 0;
+                this.addTransaction('withdraw', `Saque: ${amount.toFixed(5)} DET`, -amount);
+                this.saveUserData();
+                this.updateUI();
+                this.showToast(`Saque de ${amount.toFixed(5)} DET solicitado!`, 'success');
+            });
+        }
 
-            const withdrawBtn = document.getElementById('withdraw-btn');
-            if (withdrawBtn) {
-                withdrawBtn.addEventListener('click', () => {
-                    if ((this.userData.totalBalance || 0) < 800) {
-                        this.showToast('Mínimo de 800 DET necessário para saque.', 'error');
-                        return;
-                    }
-                    const amount = this.userData.totalBalance;
-                    this.userData.totalBalance = 0;
-                    this.addTransaction('withdraw', `Saque: ${amount.toFixed(5)} DET`, -amount);
-                    this.saveUserData();
-                    this.updateUI();
-                    this.showToast(`Saque de ${amount.toFixed(5)} DET solicitado!`, 'success');
-                });
-            }
+        const stakeVoluntaryBtn = document.getElementById('stake-voluntary-btn');
+        if (stakeVoluntaryBtn) {
+            stakeVoluntaryBtn.addEventListener('click', () => {
+                const stakeAmountInput = document.getElementById('stake-amount-input');
+                if (!stakeAmountInput) {
+                    console.error('Elemento stake-amount-input não encontrado');
+                    this.showToast('Erro: Campo de stake não encontrado.', 'error');
+                    return;
+                }
+                const amount = parseFloat(stakeAmountInput.value);
+                try {
+                    this.stakeVoluntary(amount);
+                    stakeAmountInput.value = '';
+                } catch (error) {
+                    this.showToast(error.message, 'error');
+                }
+            });
+        }
 
-            const stakeVoluntaryBtn = document.getElementById('stake-voluntary-btn');
-            if (stakeVoluntaryBtn) {
-                stakeVoluntaryBtn.addEventListener('click', () => {
-                    const stakeAmountInput = document.getElementById('stake-amount-input');
-                    if (!stakeAmountInput) {
-                        console.error('Elemento stake-amount-input não encontrado');
-                        this.showToast('Erro: Campo de stake não encontrado.', 'error');
-                        return;
-                    }
-                    const amount = parseFloat(stakeAmountInput.value);
-                    try {
-                        this.stakeVoluntary(amount);
-                        stakeAmountInput.value = '';
-                    } catch (error) {
-                        this.showToast(error.message, 'error');
-                    }
-                });
-            }
+        const unstakeVoluntaryBtn = document.getElementById('unstake-voluntary-btn');
+        if (unstakeVoluntaryBtn) {
+            unstakeVoluntaryBtn.addEventListener('click', () => {
+                const unstakeAmountInput = document.getElementById('unstake-amount-input');
+                if (!unstakeAmountInput) {
+                    console.error('Elemento unstake-amount-input não encontrado');
+                    this.showToast('Erro: Campo de retirada não encontrado.', 'error');
+                    return;
+                }
+                const amount = parseFloat(unstakeAmountInput.value);
+                try {
+                    this.unstakeVoluntaryPartial(amount);
+                    unstakeAmountInput.value = '';
+                } catch (error) {
+                    this.showToast(error.message, 'error');
+                }
+            });
+        }
 
-            const unstakeVoluntaryBtn = document.getElementById('unstake-voluntary-btn');
-            if (unstakeVoluntaryBtn) {
-                unstakeVoluntaryBtn.addEventListener('click', () => {
-                    const unstakeAmountInput = document.getElementById('unstake-amount-input');
-                    if (!unstakeAmountInput) {
-                        console.error('Elemento unstake-amount-input não encontrado');
-                        this.showToast('Erro: Campo de retirada não encontrado.', 'error');
-                        return;
-                    }
-                    const amount = parseFloat(unstakeAmountInput.value);
-                    try {
-                        this.unstakeVoluntaryPartial(amount);
-                        unstakeAmountInput.value = '';
-                    } catch (error) {
-                        this.showToast(error.message, 'error');
-                    }
-                });
-            }
+        const withdrawMaxVoluntaryBtn = document.getElementById('withdraw-max-voluntary-btn');
+        if (withdrawMaxVoluntaryBtn) {
+            withdrawMaxVoluntaryBtn.addEventListener('click', () => {
+                try {
+                    this.withdrawMaxVoluntary();
+                } catch (error) {
+                    this.showToast(error.message, 'error');
+                }
+            });
+        }
 
-            const withdrawMaxVoluntaryBtn = document.getElementById('withdraw-max-voluntary-btn');
-            if (withdrawMaxVoluntaryBtn) {
-                withdrawMaxVoluntaryBtn.addEventListener('click', () => {
-                    try {
-                        this.withdrawMaxVoluntary();
-                    } catch (error) {
-                        this.showToast(error.message, 'error');
-                    }
-                });
-            }
-
-            const withdrawMaxObligatoryBtn = document.getElementById('withdraw-max-obligatory-btn');
-            if (withdrawMaxObligatoryBtn) {
-                withdrawMaxObligatoryBtn.addEventListener('click', () => {
-                    try {
-                        this.withdrawMaxObligatory();
-                    } catch (error) {
-                        this.showToast(error.message, 'error');
-                    }
-                });
-            }
-        } catch (error) {
-            console.error('Erro ao configurar event listeners:', error);
-            this.showToast('Erro ao configurar eventos da interface.', 'error');
+        const withdrawMaxObligatoryBtn = document.getElementById('withdraw-max-obligatory-btn');
+        if (withdrawMaxObligatoryBtn) {
+            withdrawMaxObligatoryBtn.addEventListener('click', () => {
+                try {
+                    this.withdrawMaxObligatory();
+                } catch (error) {
+                    this.showToast(error.message, 'error');
+                }
+            });
         }
     }
 }
