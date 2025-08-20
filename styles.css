@@ -36,6 +36,12 @@ body {
     transform: translateY(-2px);
 }
 
+.btn-primary:disabled {
+    background-color: #6B7280;
+    cursor: not-allowed;
+    transform: none;
+}
+
 .btn-secondary {
     background-color: #60A5FA; /* Azul claro */
     color: white;
@@ -580,6 +586,43 @@ body {
 @keyframes fadeIn {
     0% { opacity: 0.5; transform: scale(1.1); }
     100% { opacity: 1; transform: scale(1); }
+}
+
+/* Estilos para Ganhos de Sorteios */
+.lottery-winnings {
+    font-size: 0.9rem;
+    color: #6B7280;
+    margin-bottom: 1rem;
+    display: flex;
+    justify-content: space-between;
+}
+
+#lottery-winnings {
+    font-weight: 600;
+    color: #38B2AC;
+}
+
+#transfer-lottery-btn {
+    background-color: #60A5FA;
+    color: white;
+    padding: 0.75rem;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color 0.3s ease, transform 0.2s ease;
+}
+
+#transfer-lottery-btn:hover {
+    background-color: #4B8CF0;
+    transform: translateY(-2px);
+}
+
+#transfer-lottery-btn:disabled {
+    background-color: #6B7280;
+    cursor: not-allowed;
+    transform: none;
 }
 
 /* Shop Page (Lottery Theme) */
@@ -1160,6 +1203,35 @@ body {
     10% { opacity: 1; transform: translateY(0); }
     90% { opacity: 1; transform: translateY(0); }
     100% { opacity: 0; transform: translateY(20px); }
+}
+
+.toast.lottery-win {
+    background: linear-gradient(135deg, #FFD700, #FFA500);
+    color: #1F2937;
+    font-weight: 600;
+    font-size: 1.1rem;
+    padding: 1rem 2rem;
+    border-radius: 12px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    animation: popIn 0.5s ease-out, fadeOut 5s ease-in-out 2s;
+}
+
+.toast.lottery-win::before {
+    content: '🎉';
+    font-size: 1.5rem;
+}
+
+@keyframes popIn {
+    0% { transform: scale(0.8); opacity: 0; }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes fadeOut {
+    0% { opacity: 1; }
+    100% { opacity: 0; }
 }
 
 /* Responsividade */

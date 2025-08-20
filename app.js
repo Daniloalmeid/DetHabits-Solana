@@ -1,4 +1,4 @@
-/* global window */
+/* global window, solana, solanaWeb3 */
 
 class DetHabitsApp {
     constructor() {
@@ -13,14 +13,17 @@ class DetHabitsApp {
             dailyYieldObligatoryAccumulated: 0,
             dailyYieldVoluntaryAccumulated: 0,
             lastYieldUpdateTime: Date.now(),
-            lastYieldResetDate: new Date().toDateString(),
+            lastYieldResetDate: new Date().toISOString(),
             spendingBalance: 0,
             completedMissions: [],
             transactions: [],
             lastMissionResetDate: Date.now(),
             dailyMissions: [],
             fixedMissions: [],
-            stakeLockEnd: null
+            stakeLockEnd: null,
+            lotteryAttempts: null,
+            walletAddress: null,
+            lotteryWinnings: 0 // Rastreia ganhos de sorteios no spendingBalance
         };
         this.allMissions = [];
         this.fixedMissions = [];
@@ -65,7 +68,7 @@ class DetHabitsApp {
                 const lastMissionResetDate = parsedData.lastMissionResetDate 
                     ? Number(parsedData.lastMissionResetDate) 
                     : Date.now();
-                
+
                 this.userData = {
                     ...this.userData,
                     ...parsedData,
@@ -77,15 +80,26 @@ class DetHabitsApp {
                     dailyYieldObligatoryAccumulated: parsedData.dailyYieldObligatoryAccumulated || 0,
                     dailyYieldVoluntaryAccumulated: parsedData.dailyYieldVoluntaryAccumulated || 0,
                     lastYieldUpdateTime: parsedData.lastYieldUpdateTime || Date.now(),
+                    lastYieldResetDate: parsedData.lastYieldResetDate || new Date().toISOString(),
                     spendingBalance: parsedData.spendingBalance || 0,
                     completedMissions: Array.isArray(parsedData.completedMissions) ? parsedData.completedMissions : [],
                     transactions: Array.isArray(parsedData.transactions) ? parsedData.transactions : [],
                     dailyMissions: Array.isArray(parsedData.dailyMissions) ? parsedData.dailyMissions : [],
                     fixedMissions: Array.isArray(parsedData.fixedMissions) ? parsedData.fixedMissions : [],
                     stakeLockEnd: parsedData.stakeLockEnd || null,
-                    lastYieldResetDate: parsedData.lastYieldResetDate || new Date().toDateString(),
-                    lastMissionResetDate: isNaN(lastMissionResetDate) ? Date.now() : lastMissionResetDate
+                    lastMissionResetDate: isNaN(lastMissionResetDate) ? Date.now() : lastMissionResetDate,
+                    lotteryAttempts: parsedData.lotteryAttempts || null,
+                    lotteryWinnings: parsedData.lotteryWinnings || 0,
+                    walletAddress: parsedData.walletAddress || null
                 };
+                // Inicializar lotteryAttempts se não estiver definido
+                if (!this.userData.lotteryAttempts) {
+                    const today = new Date().toDateString();
+                    this.userData.lotteryAttempts = {
+                        date: today,
+                        attempts: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0 }
+                    };
+                }
                 this.missions = this.userData.dailyMissions.map(mission => ({
                     ...mission,
                     completed: this.userData.completedMissions.some(cm => cm.id === mission.id)
@@ -93,16 +107,28 @@ class DetHabitsApp {
                 console.log('Dados do usuário carregados:', this.userData);
             } else {
                 console.log('Nenhum dado encontrado no localStorage, usando valores padrão');
+                const today = new Date().toDateString();
                 this.userData.lastMissionResetDate = Date.now();
                 this.userData.dailyMissions = [];
+                this.userData.lotteryAttempts = {
+                    date: today,
+                    attempts: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0 }
+                };
+                this.userData.lotteryWinnings = 0;
                 this.missions = [];
             }
             this.saveUserData();
         } catch (error) {
             console.error('Erro ao carregar dados do usuário:', error);
             this.showToast('Erro ao carregar dados do usuário. Usando valores padrão.', 'error');
+            const today = new Date().toDateString();
             this.userData.lastMissionResetDate = Date.now();
             this.userData.dailyMissions = [];
+            this.userData.lotteryAttempts = {
+                date: today,
+                attempts: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0 }
+            };
+            this.userData.lotteryWinnings = 0;
             this.missions = [];
             this.saveUserData();
         }
@@ -152,8 +178,13 @@ class DetHabitsApp {
                 completed: false
             }));
             this.userData.dailyMissions = this.missions;
-            this.userData.lastMissionResetDate = now.getTime();
+            this.userData.lastMissionResetDate = Date.now();
             this.nextMissionReset = nextResetTime;
+            // Resetar lotteryAttempts ao resetar missões diárias
+            this.userData.lotteryAttempts = {
+                date: new Date().toDateString(),
+                attempts: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0 }
+            };
             this.saveUserData();
             console.log('Novas missões diárias selecionadas:', this.missions);
             this.showToast('Novas missões diárias disponíveis!', 'success');
@@ -184,7 +215,7 @@ class DetHabitsApp {
             if (isNaN(this.nextMissionReset)) {
                 console.warn('nextMissionReset inválido, inicializando com novo valor');
                 this.nextMissionReset = now.getTime() + 24 * 60 * 60 * 1000;
-                this.userData.lastMissionResetDate = now.getTime();
+                this.userData.lastMissionResetDate = Date.now();
                 this.saveUserData();
             }
         }
@@ -205,7 +236,7 @@ class DetHabitsApp {
                 nextReset.setHours(21, 0, 0, 0);
                 nextReset.setDate(nextReset.getDate() + 1);
                 this.nextMissionReset = nextReset.getTime() - brasiliaOffset;
-                this.userData.lastMissionResetDate = now.getTime();
+                this.userData.lastMissionResetDate = Date.now();
                 this.saveUserData();
                 this.showToast('Missões diárias resetadas com sucesso!', 'success');
                 return;
@@ -344,6 +375,31 @@ class DetHabitsApp {
         }
     }
 
+    transferLotteryWinningsToTotal() {
+        console.log('Transferindo ganhos de sorteios para Saldo Total...');
+        try {
+            const amount = this.userData.lotteryWinnings || 0;
+            if (amount <= 0) {
+                throw new Error('Nenhum ganho de sorteios disponível para transferência.');
+            }
+            if (amount > this.userData.spendingBalance) {
+                throw new Error(`Saldo de Gastos insuficiente. Você tem ${this.userData.spendingBalance.toFixed(5)} DET, mas tentou transferir ${amount.toFixed(5)} DET.`);
+            }
+            this.userData.spendingBalance -= amount;
+            this.userData.totalBalance = (this.userData.totalBalance || 0) + amount;
+            this.userData.lotteryWinnings = 0;
+            this.addTransaction('transfer', `Transferência de Ganhos de Sorteios para Saldo Total: ${amount.toFixed(5)} DET`, amount);
+            this.saveUserData();
+            this.updateUI();
+            this.showToast(`Transferência de ${amount.toFixed(5)} DET de ganhos de sorteios para Saldo Total realizada com sucesso!`, 'success');
+            return amount;
+        } catch (error) {
+            console.error('Erro ao transferir ganhos de sorteios:', error);
+            this.showToast(error.message, 'error');
+            throw error;
+        }
+    }
+
     async connectWallet(onlyIfTrusted = false) {
         console.log(`Tentando conectar carteira (onlyIfTrusted: ${onlyIfTrusted})...`);
         this.showLoading('Conectando à carteira Phantom...');
@@ -386,6 +442,15 @@ class DetHabitsApp {
             const response = await window.solana.connect({ onlyIfTrusted });
             this.wallet = response.publicKey.toString();
             console.log('Carteira conectada com sucesso:', this.wallet);
+            this.userData.walletAddress = this.wallet;
+            // Inicializar lotteryAttempts se não estiver definido
+            const today = new Date().toDateString();
+            if (!this.userData.lotteryAttempts || this.userData.lotteryAttempts.date !== today) {
+                this.userData.lotteryAttempts = {
+                    date: today,
+                    attempts: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0 }
+                };
+            }
             this.showToast('Carteira Phantom conectada com sucesso!', 'success');
 
             const homePage = document.getElementById('home-page');
@@ -481,7 +546,7 @@ class DetHabitsApp {
                 return;
             }
             const now = new Date();
-            const today = now.toDateString();
+            const today = now.toISOString().split('T')[0];
 
             if ((this.userData.lastYieldResetDate || '') !== today) {
                 console.log('Novo dia detectado, transferindo rendimentos fracionários');
@@ -757,14 +822,17 @@ class DetHabitsApp {
             dailyYieldObligatoryAccumulated: 0,
             dailyYieldVoluntaryAccumulated: 0,
             lastYieldUpdateTime: Date.now(),
-            lastYieldResetDate: new Date().toDateString(),
+            lastYieldResetDate: new Date().toISOString(),
             spendingBalance: 0,
             completedMissions: [],
             transactions: [],
             lastMissionResetDate: Date.now(),
             dailyMissions: [],
             fixedMissions: [],
-            stakeLockEnd: null
+            stakeLockEnd: null,
+            lotteryAttempts: null,
+            walletAddress: null,
+            lotteryWinnings: 0
         };
         this.missions = [];
         const homePage = document.getElementById('home-page');
@@ -970,20 +1038,24 @@ class DetHabitsApp {
         const stakeBalanceElement = document.getElementById('stake-balance');
         const voluntaryStakeBalanceElement = document.getElementById('voluntary-stake-balance');
         const spendingBalanceElement = document.getElementById('spending-balance');
+        const lotteryWinningsElement = document.getElementById('lottery-winnings');
         const withdrawBtn = document.getElementById('withdraw-btn');
         const withdrawMaxObligatoryBtn = document.getElementById('withdraw-max-obligatory-btn');
         const withdrawMaxVoluntaryBtn = document.getElementById('withdraw-max-voluntary-btn');
+        const transferLotteryBtn = document.getElementById('transfer-lottery-btn');
 
         if (totalBalanceElement) totalBalanceElement.textContent = (this.userData.totalBalance || 0).toFixed(5);
         if (stakeBalanceElement) stakeBalanceElement.textContent = (this.userData.stakeBalance || 0).toFixed(5);
         if (voluntaryStakeBalanceElement) voluntaryStakeBalanceElement.textContent = (this.userData.voluntaryStakeBalance || 0).toFixed(5);
         if (spendingBalanceElement) spendingBalanceElement.textContent = (this.userData.spendingBalance || 0).toFixed(5);
+        if (lotteryWinningsElement) lotteryWinningsElement.textContent = (this.userData.lotteryWinnings || 0).toFixed(5);
         if (withdrawBtn) withdrawBtn.disabled = (this.userData.totalBalance || 0) < 800;
         if (withdrawMaxObligatoryBtn) {
             const now = new Date();
             withdrawMaxObligatoryBtn.disabled = !this.userData.stakeBalance || (this.userData.stakeLockEnd && new Date(this.userData.stakeLockEnd) > now);
         }
         if (withdrawMaxVoluntaryBtn) withdrawMaxVoluntaryBtn.disabled = !this.userData.voluntaryStakeBalance;
+        if (transferLotteryBtn) transferLotteryBtn.disabled = (this.userData.lotteryWinnings || 0) <= 0;
     }
 
     updateShopPage() {
@@ -1020,6 +1092,8 @@ class DetHabitsApp {
             case 'unstake': return '🔓';
             case 'yield': return '💸';
             case 'purchase': return '🛒';
+            case 'lottery': return '🎰';
+            case 'transfer': return '➡️';
             default: return '💰';
         }
     }
@@ -1052,7 +1126,11 @@ class DetHabitsApp {
 
     showToast(message, type = 'info') {
         const toastContainer = document.getElementById('toast-container');
-        if (!toastContainer) return;
+        if (!toastContainer) {
+            console.warn('Container de toast não encontrado, usando alert.');
+            alert(`${type.toUpperCase()}: ${message}`);
+            return;
+        }
         const toast = document.createElement('div');
         toast.className = `toast ${type}`;
         toast.textContent = message;
@@ -1241,6 +1319,7 @@ class DetHabitsApp {
                     }
                     const itemName = item.querySelector('h4')?.textContent || 'Item';
                     this.userData.spendingBalance -= price;
+                    this.userData.lotteryWinnings = Math.max(0, (this.userData.lotteryWinnings || 0) - price);
                     this.addTransaction('purchase', `Compra: ${itemName} (-${price.toFixed(5)} DET)`, -price);
                     this.saveUserData();
                     this.updateUI();
@@ -1324,11 +1403,22 @@ class DetHabitsApp {
                 }
             });
         }
+
+        const transferLotteryBtn = document.getElementById('transfer-lottery-btn');
+        if (transferLotteryBtn) {
+            transferLotteryBtn.addEventListener('click', () => {
+                try {
+                    this.transferLotteryWinningsToTotal();
+                } catch (error) {
+                    this.showToast(error.message, 'error');
+                }
+            });
+        }
     }
 }
 
-const app = new DetHabitsApp();
+window.app = new DetHabitsApp();
 document.addEventListener('DOMContentLoaded', () => {
     console.log('DOM carregado, inicializando aplicação...');
-    app.init();
+    window.app.init();
 });
