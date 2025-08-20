@@ -1603,7 +1603,7 @@
     ],
     "fixedMissions": [
         {
-            "id": "follow_x_1",
+            "id": "siga",
             "title": "Seguir no X",
             "description": "Siga nossa conta oficial no X e tire um print da tela.",
             "icon": "🐦",
