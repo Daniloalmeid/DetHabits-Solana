@@ -28,7 +28,8 @@ class DetHabitsApp {
         this.currentPage = 'home';
         this.currentMission = null;
         this.nextMissionReset = null;
-        this.minuteYieldRate = 10 / (365 * 24 * 60) / 100;
+        // Taxa de rendimento ajustada para 300% ao ano
+        this.minuteYieldRate = 300 / (365 * 24 * 60) / 100; // 300% ao ano
         this.secondYieldRate = this.minuteYieldRate / 60;
         this.yieldInterval = null;
         this.uiYieldInterval = null;
@@ -37,23 +38,14 @@ class DetHabitsApp {
     async init() {
         console.log('Inicializando DetHabitsApp...');
         try {
-            // Carregar dados do usuário primeiro
             this.loadUserData();
-            // Carregar missões do JSON
             await this.loadAllMissions();
-            // Selecionar missões diárias, mantendo as existentes se válido
             this.selectDailyMissions();
-            // Carregar missões na UI imediatamente
             this.loadMissions();
-            // Iniciar temporizador após carregar missões
             this.startMissionTimer();
-            // Atualizar UI
             this.updateUI();
-            // Configurar eventos
             this.setupEventListeners();
-            // Iniciar backup automático
             this.startBackupInterval();
-            // Tentar reconexão com Phantom
             if (window.solana && window.solana.isPhantom) {
                 console.log('Tentando reconexão automática com Phantom...');
                 await this.connectWallet(true);
@@ -70,7 +62,6 @@ class DetHabitsApp {
             const savedData = localStorage.getItem(`dethabits_${this.wallet || 'default'}`);
             if (savedData) {
                 const parsedData = JSON.parse(savedData);
-                // Garantir que lastMissionResetDate seja um número (timestamp)
                 const lastMissionResetDate = parsedData.lastMissionResetDate 
                     ? Number(parsedData.lastMissionResetDate) 
                     : Date.now();
@@ -95,7 +86,6 @@ class DetHabitsApp {
                     lastYieldResetDate: parsedData.lastYieldResetDate || new Date().toDateString(),
                     lastMissionResetDate: isNaN(lastMissionResetDate) ? Date.now() : lastMissionResetDate
                 };
-                // Sincronizar this.missions com userData.dailyMissions
                 this.missions = this.userData.dailyMissions.map(mission => ({
                     ...mission,
                     completed: this.userData.completedMissions.some(cm => cm.id === mission.id)
@@ -120,21 +110,30 @@ class DetHabitsApp {
 
     selectDailyMissions(forceReset = false) {
         console.log('Selecionando missões diárias...');
-        const now = Date.now();
-        const timeSinceLastReset = now - this.userData.lastMissionResetDate;
-        const oneDay = 24 * 60 * 60 * 1000;
+        const now = new Date();
+        // Ajustar para horário de Brasília (UTC-3)
+        const brasiliaOffset = -3 * 60 * 60 * 1000; // -3 horas em milissegundos
+        const nowBrasilia = new Date(now.getTime() + brasiliaOffset);
+        const today21hBrasilia = new Date(nowBrasilia);
+        today21hBrasilia.setHours(21, 0, 0, 0); // Definir para 21:00:00.000
+        if (nowBrasilia > today21hBrasilia) {
+            today21hBrasilia.setDate(today21hBrasilia.getDate() + 1); // Próximo reset é amanhã às 21h
+        }
+        const nextResetTime = today21hBrasilia.getTime() - brasiliaOffset; // Converter de volta para UTC
+        const timeSinceLastReset = now.getTime() - this.userData.lastMissionResetDate;
 
         console.log('lastMissionResetDate:', new Date(this.userData.lastMissionResetDate));
         console.log('Time since last reset:', timeSinceLastReset / (60 * 1000), 'minutes');
         console.log('forceReset:', forceReset, 'dailyMissions length:', this.userData.dailyMissions.length);
+        console.log('Next reset (21h Brasília):', new Date(nextResetTime));
 
-        // Verificar se as missões diárias são válidas (tem ID e correspondem a allMissions)
+        // Verificar se as missões diárias são válidas
         const areMissionsValid = this.userData.dailyMissions.length > 0 &&
             this.userData.dailyMissions.every(mission =>
                 mission.id && this.allMissions.some(am => am.id === mission.id)
             );
 
-        if (forceReset || timeSinceLastReset >= oneDay || !areMissionsValid) {
+        if (forceReset || timeSinceLastReset >= (nextResetTime - this.userData.lastMissionResetDate) || !areMissionsValid) {
             console.log('Resetando missões diárias');
             if (this.allMissions.length === 0) {
                 console.warn('Nenhuma missão diária disponível em allMissions');
@@ -153,8 +152,8 @@ class DetHabitsApp {
                 completed: false
             }));
             this.userData.dailyMissions = this.missions;
-            this.userData.lastMissionResetDate = now;
-            this.nextMissionReset = now + oneDay;
+            this.userData.lastMissionResetDate = now.getTime();
+            this.nextMissionReset = nextResetTime;
             this.saveUserData();
             console.log('Novas missões diárias selecionadas:', this.missions);
             this.showToast('Novas missões diárias disponíveis!', 'success');
@@ -164,35 +163,49 @@ class DetHabitsApp {
                 ...mission,
                 completed: this.userData.completedMissions.some(cm => cm.id === mission.id)
             }));
-            this.nextMissionReset = this.userData.lastMissionResetDate + oneDay;
+            this.nextMissionReset = nextResetTime;
         }
         console.log('Próximo reset:', new Date(this.nextMissionReset));
     }
 
     startMissionTimer() {
         console.log('Iniciando temporizador de missões');
-        // Garantir que nextMissionReset esteja inicializado
+        // Garantir que nextMissionReset esteja inicializado para 21h de Brasília
         if (!this.nextMissionReset || isNaN(this.nextMissionReset)) {
-            this.nextMissionReset = this.userData.lastMissionResetDate + 24 * 60 * 60 * 1000;
+            const now = new Date();
+            const brasiliaOffset = -3 * 60 * 60 * 1000; // UTC-3
+            const nowBrasilia = new Date(now.getTime() + brasiliaOffset);
+            const nextReset = new Date(nowBrasilia);
+            nextReset.setHours(21, 0, 0, 0);
+            if (nowBrasilia > nextReset) {
+                nextReset.setDate(nextReset.getDate() + 1);
+            }
+            this.nextMissionReset = nextReset.getTime() - brasiliaOffset;
             if (isNaN(this.nextMissionReset)) {
                 console.warn('nextMissionReset inválido, inicializando com novo valor');
-                this.nextMissionReset = Date.now() + 24 * 60 * 60 * 1000;
-                this.userData.lastMissionResetDate = Date.now();
+                this.nextMissionReset = now.getTime() + 24 * 60 * 60 * 1000;
+                this.userData.lastMissionResetDate = now.getTime();
                 this.saveUserData();
             }
         }
 
         const updateTimer = () => {
-            const now = Date.now();
-            const diff = this.nextMissionReset - now;
+            const now = new Date();
+            const diff = this.nextMissionReset - now.getTime();
 
             if (diff <= 0) {
                 console.log('Resetando missões diárias');
                 this.selectDailyMissions(true);
                 this.loadMissions();
                 this.updateMissionProgress();
-                this.nextMissionReset = Date.now() + 24 * 60 * 60 * 1000;
-                this.userData.lastMissionResetDate = Date.now();
+                // Calcular próximo reset para 21h de Brasília
+                const brasiliaOffset = -3 * 60 * 60 * 1000;
+                const nowBrasilia = new Date(now.getTime() + brasiliaOffset);
+                const nextReset = new Date(nowBrasilia);
+                nextReset.setHours(21, 0, 0, 0);
+                nextReset.setDate(nextReset.getDate() + 1);
+                this.nextMissionReset = nextReset.getTime() - brasiliaOffset;
+                this.userData.lastMissionResetDate = now.getTime();
                 this.saveUserData();
                 this.showToast('Missões diárias resetadas com sucesso!', 'success');
                 return;
@@ -223,7 +236,6 @@ class DetHabitsApp {
             return;
         }
 
-        // Carregar missões diárias
         missionsGrid.innerHTML = '';
         this.missions.forEach(mission => {
             const isCompleted = this.userData.completedMissions.some(cm => cm.id === mission.id);
@@ -244,7 +256,6 @@ class DetHabitsApp {
             missionsGrid.appendChild(missionCard);
         });
 
-        // Carregar missões fixas
         fixedMissionsGrid.innerHTML = '';
         this.fixedMissions.forEach(mission => {
             const isCompleted = this.userData.completedMissions.some(cm => cm.id === mission.id);
@@ -268,14 +279,13 @@ class DetHabitsApp {
 
     openMissionModal(missionId) {
         console.log('Abrindo modal para missão:', missionId);
-        // Buscar missão em this.missions ou this.fixedMissions
         const mission = this.missions.find(m => m.id === missionId) || this.fixedMissions.find(m => m.id === missionId);
         if (!mission) {
             console.error('Missão não encontrada:', missionId);
             this.showToast('Missão não encontrada.', 'error');
             return;
         }
-        this.currentMission = { ...mission }; // Criar uma cópia para evitar mutação direta
+        this.currentMission = { ...mission };
         const modal = document.getElementById('photo-modal');
         const modalTitle = document.getElementById('modal-mission-title');
         if (modal && modalTitle) {
@@ -310,11 +320,9 @@ class DetHabitsApp {
                 this.userData.stakeLockEnd = lockEnd.toISOString();
             }
 
-            // Adicionar missão concluída
             this.userData.completedMissions.push({ id: this.currentMission.id, completedAt: new Date().toISOString() });
             this.addTransaction('mission', `Missão Concluída: ${this.currentMission.title} (+${reward} DET: 80% Total, 10% Stake, 10% Gastos)`, reward);
             
-            // Atualizar status de conclusão em this.missions
             const missionIndex = this.missions.findIndex(m => m.id === this.currentMission.id);
             if (missionIndex !== -1) {
                 this.missions[missionIndex].completed = true;
@@ -384,11 +392,8 @@ class DetHabitsApp {
             if (homePage) homePage.style.display = 'none';
             const navbar = document.getElementById('navbar');
             if (navbar) navbar.style.display = 'block';
-            // Carregar dados do usuário para a nova carteira
             this.loadUserData();
-            // Re-selecionar missões para garantir sincronia
             this.selectDailyMissions();
-            // Carregar missões na UI
             this.loadMissions();
             this.navigateTo('missions');
             this.updateWalletDisplay();
@@ -409,7 +414,6 @@ class DetHabitsApp {
         }
     }
 
-    // Funções inalteradas (mantidas para completude)
     initStaking() {
         console.log('Inicializando funcionalidades de staking...');
         try {
