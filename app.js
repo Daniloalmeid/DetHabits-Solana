@@ -40,7 +40,7 @@ class DetHabitsApp {
         this.secondYieldRate = this.minuteYieldRate / 60;
         this.yieldInterval = null;
         this.uiYieldInterval = null;
-        this.TOKEN_PROGRAM_ID = null; // Substitua pelo endereço real do token DET
+        this.z = null; // Substitua pelo endereço real do token DET
         this.initializeSolanaConnection();
         this.initializeCentralWallet();
     }
