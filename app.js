@@ -5,6 +5,10 @@ class DetHabitsApp {
         console.log('Construindo DetHabitsApp...');
         this.wallet = null;
         this.connection = null;
+        // ATENÇÃO: NÃO ARMAZENE A CHAVE PRIVADA NO FRONTEND EM PRODUÇÃO!
+        // Mova para um backend seguro ou use uma API para assinar transações.
+        this.CENTRAL_WALLET_KEY = null; // Substitua por Uint8Array da chave privada da carteira central (ex.: [1,2,3,...])
+        this.centralWalletKeypair = null;
         this.userData = {
             totalBalance: 294,
             stakeBalance: 0,
@@ -38,6 +42,7 @@ class DetHabitsApp {
         this.uiYieldInterval = null;
         this.TOKEN_PROGRAM_ID = null; // Substitua pelo endereço real do token DET
         this.initializeSolanaConnection();
+        this.initializeCentralWallet();
     }
 
     initializeSolanaConnection() {
@@ -61,13 +66,39 @@ class DetHabitsApp {
                 console.error(`Erro ao conectar com ${endpoint}:`, error);
             }
         }
-        console.error('Não foi possível conectar à rede Solana');
-        this.showToast('Falha ao conectar à rede Solana.', 'warning');
+        console.warn('Não foi possível conectar à rede Solana. Continuando sem conexão blockchain.');
+        this.showToast('Falha ao conectar à rede Solana. Transações serão simuladas.', 'warning');
+    }
+
+    initializeCentralWallet() {
+        console.log('Inicializando carteira central...');
+        if (this.CENTRAL_WALLET_KEY) {
+            try {
+                this.centralWalletKeypair = solanaWeb3.Keypair.fromSecretKey(new Uint8Array(this.CENTRAL_WALLET_KEY));
+                console.log('Carteira central inicializada:', this.centralWalletKeypair.publicKey.toString());
+            } catch (error) {
+                console.error('Erro ao inicializar carteira central:', error);
+                this.showToast('Erro ao configurar carteira central. Saques serão simulados.', 'error');
+            }
+        } else {
+            console.warn('Chave da carteira central não fornecida. Saques serão simulados.');
+            this.showToast('Carteira central não configurada. Saques serão simulados.', 'warning');
+        }
+    }
+
+    diagnosePhantom() {
+        console.log('Diagnóstico da Phantom Wallet:');
+        console.log('window.solana existe:', !!window.solana);
+        console.log('window.solana.isPhantom:', window.solana?.isPhantom);
+        console.log('Navegador seguro (HTTPS):', window.isSecureContext);
+        console.log('Modo anônimo detectado:', window.navigator.userAgent.includes('Private Browsing'));
+        console.log('User Agent:', navigator.userAgent);
     }
 
     async init() {
         console.log('Inicializando DetHabitsApp...');
         try {
+            this.diagnosePhantom();
             this.loadUserData();
             await this.loadAllMissions();
             this.selectDailyMissions();
@@ -76,35 +107,38 @@ class DetHabitsApp {
             this.updateUI();
             this.setupEventListeners();
             this.startBackupInterval();
-            const phantomAvailable = await this.waitForPhantom(15000);
+            const phantomAvailable = await this.waitForPhantom(20000);
             if (phantomAvailable) {
-                console.log('Phantom Wallet detectada. Configurando listener...');
+                console.log('Phantom Wallet detectada. Configurando listeners...');
                 window.solana.on('connect', () => {
+                    console.log('Evento connect disparado');
                     this.wallet = window.solana.publicKey?.toString();
                     if (this.wallet) {
                         this.userData.walletAddress = this.wallet;
                         this.onWalletConnected();
                     } else {
+                        console.error('Endereço da carteira não obtido');
                         this.showToast('Erro ao obter endereço da carteira.', 'error');
                     }
                 });
                 window.solana.on('disconnect', () => {
+                    console.log('Evento disconnect disparado');
                     this.disconnectWallet();
                 });
-                await this.connectWallet(true, 3);
+                await this.connectWallet(false, 3);
             } else {
-                console.warn('Phantom Wallet não detectada');
-                this.showToast('Por favor, instale ou desbloqueie a Phantom Wallet.', 'warning');
+                console.warn('Phantom Wallet não detectada após timeout');
+                this.showToast('Instale ou desbloqueie a Phantom Wallet.', 'error');
                 if (window.isSecureContext === false) {
-                    this.showToast('Use HTTPS ou localhost para conexões seguras com a Phantom.', 'error');
+                    this.showToast('Use HTTPS ou localhost para conexões seguras.', 'error');
                 }
                 if (window.navigator.userAgent.includes('Private Browsing')) {
-                    this.showToast('Modo de navegação anônima detectado. Desative para usar a Phantom.', 'error');
+                    this.showToast('Modo anônimo detectado. Desative para usar a Phantom.', 'error');
                 }
             }
         } catch (error) {
             console.error('Erro durante inicialização:', error);
-            this.showToast('Erro ao inicializar a aplicação.', 'error');
+            this.showToast('Erro ao inicializar a aplicação. Verifique o console.', 'error');
         }
     }
 
@@ -118,6 +152,7 @@ class DetHabitsApp {
             }
             await new Promise(resolve => setTimeout(resolve, 100));
         }
+        console.log('Phantom Wallet detectada em', Date.now() - start, 'ms');
         return true;
     }
 
@@ -147,11 +182,11 @@ class DetHabitsApp {
             }
             if (isMobile) {
                 const appUrl = encodeURIComponent('https://daniloalmeid.github.io/DetHabits-Solana/');
-                const deepLink = `phantom://connect?app_url=${appUrl}&dapp_name=DetHabits`;
+                const deepLink = `phantom://open?dapp_url=${appUrl}&connect=true`;
                 console.log('Redirecionando para:', deepLink);
                 this.showToast('Abra no navegador interno do Phantom.', 'info');
                 window.location.href = deepLink;
-                await new Promise(resolve => setTimeout(resolve, 5000));
+                await new Promise(resolve => setTimeout(resolve, 10000));
                 if (window.solana && window.solana.isPhantom) {
                     await this.connectWallet(false, 1);
                 } else {
@@ -159,6 +194,7 @@ class DetHabitsApp {
                 }
             } else {
                 this.showToast('Instale a extensão Phantom ou verifique se está desbloqueada.', 'error');
+                window.open('https://phantom.app/', '_blank');
             }
         } finally {
             this.hideLoading();
@@ -191,33 +227,55 @@ class DetHabitsApp {
     async withdrawToWallet(destinationAddress, amount) {
         console.log('Iniciando saque:', { destinationAddress, amount });
         try {
-            if (!this.wallet) throw new Error('Carteira não conectada.');
-            if (!window.solana || !window.solana.isPhantom) throw new Error('Phantom Wallet não detectada.');
+            if (!this.wallet) throw new Error('Carteira do usuário não conectada.');
             if (!this.connection) throw new Error('Conexão com Solana não estabelecida.');
             if (typeof splToken === 'undefined') throw new Error('Biblioteca @solana/spl-token não carregada.');
+            if (!this.TOKEN_PROGRAM_ID) throw new Error('Endereço do token DET não configurado.');
+            if (!this.centralWalletKeypair) throw new Error('Carteira central não configurada. Saque será simulado.');
+
             amount = parseFloat(amount.toFixed(5));
             if (isNaN(amount) || amount < 800) throw new Error('Mínimo de 800 DET para saque.');
             if (amount > (this.userData.totalBalance || 0)) throw new Error(`Saldo insuficiente: ${this.userData.totalBalance.toFixed(5)} DET.`);
+
             const destinationPubkey = new solanaWeb3.PublicKey(destinationAddress);
+            const centralPubkey = this.centralWalletKeypair.publicKey;
+
             this.showLoading('Processando saque...');
-            const fromPubkey = new solanaWeb3.PublicKey(this.wallet);
-            const fromTokenAccount = await this.getOrCreateAssociatedTokenAccount(fromPubkey);
-            const toTokenAccount = await this.getOrCreateAssociatedTokenAccount(destinationPubkey);
+
+            // Verificar saldo da carteira central
+            const centralTokenAccount = await this.getOrCreateAssociatedTokenAccount(centralPubkey);
+            const centralBalance = await this.connection.getTokenAccountBalance(centralTokenAccount);
+            const centralBalanceValue = centralBalance.value.uiAmount;
+            if (centralBalanceValue < amount) {
+                throw new Error(`Carteira central tem saldo insuficiente: ${centralBalanceValue.toFixed(5)} DET.`);
+            }
+
+            // Criar conta de token para o destinatário, se necessário
+            const destinationTokenAccount = await this.getOrCreateAssociatedTokenAccount(destinationPubkey);
+
+            // Criar transação de transferência
             const transaction = new solanaWeb3.Transaction().add(
                 splToken.createTransferInstruction(
-                    fromTokenAccount,
-                    toTokenzu
-                    fromPubkey,
-                    Math.round(amount * 1e9),
+                    centralTokenAccount,
+                    destinationTokenAccount,
+                    centralPubkey,
+                    Math.round(amount * 1e9), // Assumindo 9 decimais para o token DET
                     []
                 )
             );
+
             const { blockhash } = await this.connection.getLatestBlockhash();
             transaction.recentBlockhash = blockhash;
-            transaction.feePayer = fromPubkey;
-            const signedTransaction = await window.solana.signTransaction(transaction);
-            const signature = await this.connection.sendRawTransaction(signedTransaction.serialize());
+            transaction.feePayer = centralPubkey;
+
+            // Assinar com a carteira central
+            transaction.sign(this.centralWalletKeypair);
+
+            // Enviar transação
+            const signature = await this.connection.sendRawTransaction(transaction.serialize());
             await this.connection.confirmTransaction(signature, 'confirmed');
+
+            // Atualizar saldos e registrar transação
             this.userData.totalBalance -= amount;
             this.addTransaction('withdraw', `Saque para ${destinationAddress.slice(0, 4)}...${destinationAddress.slice(-4)}: ${amount.toFixed(5)} DET`, -amount);
             this.saveUserData();
@@ -252,7 +310,7 @@ class DetHabitsApp {
             if (!accountInfo) {
                 const transaction = new solanaWeb3.Transaction().add(
                     splToken.createAssociatedTokenAccountInstruction(
-                        pubkey,
+                        this.centralWalletKeypair ? this.centralWalletKeypair.publicKey : pubkey,
                         associatedTokenAddress,
                         pubkey,
                         this.TOKEN_PROGRAM_ID
@@ -260,10 +318,14 @@ class DetHabitsApp {
                 );
                 const { blockhash } = await this.connection.getLatestBlockhash();
                 transaction.recentBlockhash = blockhash;
-                transaction.feePayer = pubkey;
-                const signedTransaction = await window.solana.signTransaction(transaction);
-                const signature = await this.connection.sendRawTransaction(signedTransaction.serialize());
-                await this.connection.confirmTransaction(signature, 'confirmed');
+                transaction.feePayer = this.centralWalletKeypair ? this.centralWalletKeypair.publicKey : pubkey;
+                if (this.centralWalletKeypair) {
+                    transaction.sign(this.centralWalletKeypair);
+                } else {
+                    const signedTransaction = await window.solana.signTransaction(transaction);
+                    const signature = await this.connection.sendRawTransaction(signedTransaction.serialize());
+                    await this.connection.confirmTransaction(signature, 'confirmed');
+                }
             }
             return associatedTokenAddress;
         } catch (error) {
@@ -1184,6 +1246,7 @@ class DetHabitsApp {
         if (connectWalletBtn) {
             connectWalletBtn.addEventListener('click', () => {
                 console.log('Botão de conexão clicado');
+                this.diagnosePhantom();
                 this.connectWallet(false);
             });
         }
