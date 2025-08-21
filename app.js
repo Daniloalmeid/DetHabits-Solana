@@ -94,7 +94,7 @@ class DetHabitsApp {
                 };
                 // Inicializar lotteryAttempts se não estiver definido
                 if (!this.userData.lotteryAttempts) {
-                    const today = new Date().toDateString();
+                    const today = this.getCurrentDate();
                     this.userData.lotteryAttempts = {
                         date: today,
                         attempts: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0 }
@@ -107,7 +107,7 @@ class DetHabitsApp {
                 console.log('Dados do usuário carregados:', this.userData);
             } else {
                 console.log('Nenhum dado encontrado no localStorage, usando valores padrão');
-                const today = new Date().toDateString();
+                const today = this.getCurrentDate();
                 this.userData.lastMissionResetDate = Date.now();
                 this.userData.dailyMissions = [];
                 this.userData.lotteryAttempts = {
@@ -121,7 +121,7 @@ class DetHabitsApp {
         } catch (error) {
             console.error('Erro ao carregar dados do usuário:', error);
             this.showToast('Erro ao carregar dados do usuário. Usando valores padrão.', 'error');
-            const today = new Date().toDateString();
+            const today = this.getCurrentDate();
             this.userData.lastMissionResetDate = Date.now();
             this.userData.dailyMissions = [];
             this.userData.lotteryAttempts = {
@@ -134,6 +134,11 @@ class DetHabitsApp {
         }
     }
 
+    getCurrentDate() {
+        const now = new Date();
+        return `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`;
+    }
+
     selectDailyMissions(forceReset = false) {
         console.log('Selecionando missões diárias...');
         const now = new Date();
@@ -142,7 +147,7 @@ class DetHabitsApp {
         const nowBrasilia = new Date(now.getTime() + brasiliaOffset);
         const today21hBrasilia = new Date(nowBrasilia);
         today21hBrasilia.setHours(21, 0, 0, 0); // Definir para 21:00:00.000
-        if (nowBrasilia > today21hBrasilia) {
+        if (nowBrasilia >= today21hBrasilia) {
             today21hBrasilia.setDate(today21hBrasilia.getDate() + 1); // Próximo reset é amanhã às 21h
         }
         const nextResetTime = today21hBrasilia.getTime() - brasiliaOffset; // Converter de volta para UTC
@@ -159,7 +164,7 @@ class DetHabitsApp {
                 mission.id && this.allMissions.some(am => am.id === mission.id)
             );
 
-        if (forceReset || timeSinceLastReset >= (nextResetTime - this.userData.lastMissionResetDate) || !areMissionsValid) {
+        if (forceReset || timeSinceLastReset >= (24 * 60 * 60 * 1000) || !areMissionsValid) {
             console.log('Resetando missões diárias');
             if (this.allMissions.length === 0) {
                 console.warn('Nenhuma missão diária disponível em allMissions');
@@ -182,7 +187,7 @@ class DetHabitsApp {
             this.nextMissionReset = nextResetTime;
             // Resetar lotteryAttempts ao resetar missões diárias
             this.userData.lotteryAttempts = {
-                date: new Date().toDateString(),
+                date: this.getCurrentDate(),
                 attempts: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0 }
             };
             this.saveUserData();
@@ -208,7 +213,7 @@ class DetHabitsApp {
             const nowBrasilia = new Date(now.getTime() + brasiliaOffset);
             const nextReset = new Date(nowBrasilia);
             nextReset.setHours(21, 0, 0, 0);
-            if (nowBrasilia > nextReset) {
+            if (nowBrasilia >= nextReset) {
                 nextReset.setDate(nextReset.getDate() + 1);
             }
             this.nextMissionReset = nextReset.getTime() - brasiliaOffset;
@@ -222,23 +227,30 @@ class DetHabitsApp {
 
         const updateTimer = () => {
             const now = new Date();
+            const brasiliaOffset = -3 * 60 * 60 * 1000; // UTC-3
+            const nowBrasilia = new Date(now.getTime() + brasiliaOffset);
+            const today21hBrasilia = new Date(nowBrasilia);
+            today21hBrasilia.setHours(21, 0, 0, 0);
+            if (nowBrasilia >= today21hBrasilia) {
+                today21hBrasilia.setDate(today21hBrasilia.getDate() + 1);
+            }
+            this.nextMissionReset = today21hBrasilia.getTime() - brasiliaOffset;
+
             const diff = this.nextMissionReset - now.getTime();
 
-            if (diff <= 0) {
+            if (diff <= 0 || (now.getTime() - this.userData.lastMissionResetDate) >= (24 * 60 * 60 * 1000)) {
                 console.log('Resetando missões diárias');
                 this.selectDailyMissions(true);
                 this.loadMissions();
                 this.updateMissionProgress();
-                // Calcular próximo reset para 21h de Brasília
-                const brasiliaOffset = -3 * 60 * 60 * 1000;
-                const nowBrasilia = new Date(now.getTime() + brasiliaOffset);
+                this.userData.lastMissionResetDate = Date.now();
+                this.saveUserData();
+                this.showToast('Missões diárias resetadas com sucesso!', 'success');
+                // Calcular próximo reset para 21h de Brasília do próximo dia
                 const nextReset = new Date(nowBrasilia);
                 nextReset.setHours(21, 0, 0, 0);
                 nextReset.setDate(nextReset.getDate() + 1);
                 this.nextMissionReset = nextReset.getTime() - brasiliaOffset;
-                this.userData.lastMissionResetDate = Date.now();
-                this.saveUserData();
-                this.showToast('Missões diárias resetadas com sucesso!', 'success');
                 return;
             }
 
@@ -447,7 +459,7 @@ class DetHabitsApp {
             console.log('Carteira conectada com sucesso:', this.wallet);
             this.userData.walletAddress = this.wallet;
             // Inicializar lotteryAttempts se não estiver definido
-            const today = new Date().toDateString();
+            const today = this.getCurrentDate();
             if (!this.userData.lotteryAttempts || this.userData.lotteryAttempts.date !== today) {
                 this.userData.lotteryAttempts = {
                     date: today,

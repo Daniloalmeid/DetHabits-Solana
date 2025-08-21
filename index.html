@@ -5,10 +5,40 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DetHabits - Solana</title>
     <link rel="stylesheet" href="styles.css">
-    <script src="https://unpkg.com/@solana/web3.js@1.95.3/dist/index.iife.min.js"></script>
-    <script src="https://unpkg.com/@solana/spl-token@0.4.8/dist/index.iife.min.js"></script>
-    <script type="module" src="app.js" defer></script>
-    <script type="module" src="lottery.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/@solana/web3.js@1.95.3/lib/index.iife.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@solana/spl-token@0.4.8/lib/index.iife.min.js"></script>
+    <script src="app.js" defer></script>
+    <script src="lottery.js" defer></script>
+    <style>
+        /* Estilos adicionais para novos elementos de saque */
+        .withdraw-input-group {
+            margin-bottom: 1rem;
+        }
+        .withdraw-input-group label {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+        }
+        .withdraw-input-group input {
+            width: 100%;
+            padding: 0.5rem;
+            border: 1px solid #ccc;
+            border-radius: 0.25rem;
+            font-size: 1rem;
+        }
+        .withdraw-input-group input:disabled {
+            background-color: #f0f0f0;
+            cursor: not-allowed;
+        }
+        .btn-primary:disabled {
+            background-color: #a0aec0;
+            cursor: not-allowed;
+        }
+        .mobile-instruction a {
+            color: #3182ce;
+            text-decoration: underline;
+        }
+    </style>
 </head>
 <body>
     <div class="container">
@@ -23,7 +53,7 @@
                     <button class="nav-button" data-page="whitepaper">Whitepaper</button>
                     <button class="nav-button" data-page="presale">Pré-venda</button>
                     <div class="wallet-info">
-                        <span id="wallet-address"></span>
+                        <span id="wallet-address">Não conectado</span>
                         <button id="disconnect-btn">Desconectar</button>
                     </div>
                 </div>
@@ -59,7 +89,8 @@
                 <p class="mobile-instruction">
                     No celular, abra esta URL no navegador interno do aplicativo Phantom:<br>
                     <span id="app-url">https://daniloalmeid.github.io/DetHabits-Solana/</span><br>
-                    <button id="copy-url-btn" class="btn-secondary">Copiar URL</button>
+                    <button id="copy-url-btn" class="btn-secondary">Copiar URL</button><br>
+                    <a href="phantom://connect?app_url=https%3A%2F%2Fdaniloalmeid.github.io%2FDetHabits-Solana%2F&dapp_name=DetHabits" class="mt-2 inline-block">Abrir no Phantom</a>
                 </p>
                 <div class="hero-buttons">
                     <button id="connect-wallet-btn" class="btn-primary">Conectar Carteira Phantom</button>
@@ -94,7 +125,7 @@
         <div id="wallet-page" class="page">
             <div class="page-header">
                 <h1>Carteira</h1>
-                <div id="wallet-address-full"></div>
+                <div id="wallet-address-full">Não conectado</div>
             </div>
             <div class="wallet-cards">
                 <div class="wallet-card">
@@ -104,6 +135,12 @@
                     </div>
                     <div class="balance-amount">
                         <span id="total-balance">0</span> DET
+                    </div>
+                    <div class="withdraw-input-group">
+                        <label for="withdraw-amount-input">Quantidade para Saque (mínimo 800 DET)</label>
+                        <input type="number" id="withdraw-amount-input" placeholder="Quantidade (DET)" min="800" step="0.00001">
+                        <label for="withdraw-address-input">Endereço da Carteira de Destino</label>
+                        <input type="text" id="withdraw-address-input" placeholder="Endereço da carteira">
                     </div>
                     <button id="withdraw-btn" class="btn-primary full-width" disabled>Sacar</button>
                     <span class="withdraw-notice">Mínimo de 800 DET para saque</span>
