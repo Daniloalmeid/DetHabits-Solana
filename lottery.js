@@ -126,24 +126,26 @@ class LotterySystem {
         }
 
         try {
+            // Deduzir o custo do baú
             this.app.userData.spendingBalance -= lottery.cost;
+            // Gerar o prêmio
             const prize = Math.random() * (lottery.maxPrize - lottery.minPrize) + lottery.minPrize;
+            // Adicionar o prêmio ao spendingBalance e rastrear em lotteryWinnings
             this.app.userData.spendingBalance += prize;
             this.app.userData.lotteryWinnings = (this.app.userData.lotteryWinnings || 0) + prize;
 
+            // Incrementar tentativas
             this.app.userData.lotteryAttempts[lotteryId].count += 1;
-            this.app.userData.transactions.push({
-                type: 'lottery',
-                description: `Sorteio ${lottery.name}: Custo ${lottery.cost} DET, Prêmio ${prize.toFixed(5)} DET`,
-                amount: prize - lottery.cost,
-                timestamp: new Date().toISOString()
-            });
+
+            // Registrar transações separadas para custo e prêmio
+            this.app.addTransaction('lottery', `Sorteio ${lottery.name}: Custo ${lottery.cost} DET`, -lottery.cost);
+            this.app.addTransaction('lottery', `Sorteio ${lottery.name}: Prêmio ${prize.toFixed(5)} DET`, prize);
 
             this.app.saveUserData();
             this.app.updateUI();
 
             this.showLotteryWinModal(lottery.name, prize);
-            console.log(`Sorteio ${lottery.name} concluído: Custo ${lottery.cost} DET, Prêmio ${prize.toFixed(5)} DET`);
+            console.log(`Sorteio ${lottery.name} concluído: Custo ${lottery.cost} DET, Prêmio ${prize.toFixed(5)} DET, Resultado líquido: ${(prize - lottery.cost).toFixed(5)} DET`);
         } catch (error) {
             console.error('Erro ao processar sorteio:', error);
             this.app.showToast('Erro ao processar o sorteio. Tente novamente.', 'error');
