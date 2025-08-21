@@ -2,16 +2,16 @@ class LotterySystem {
     constructor(app) {
         this.app = app;
         this.lotteries = [
-            { id: 1, name: "Baú Inicial", cost: 1, minPrize: 1, maxPrize: 3 },
-            { id: 2, name: "Baú Simples", cost: 5, minPrize: 4, maxPrize: 12 },
-            { id: 3, name: "Baú de Bronze", cost: 10, minPrize: 8, maxPrize: 20 },
-            { id: 4, name: "Baú de Prata", cost: 20, minPrize: 16, maxPrize: 40 },
-            { id: 5, name: "Baú de Ouro", cost: 40, minPrize: 32, maxPrize: 70 },
-            { id: 6, name: "Baú de Platina", cost: 60, minPrize: 50, maxPrize: 100 },
-            { id: 7, name: "Baú Épico", cost: 80, minPrize: 65, maxPrize: 130 },
-            { id: 8, name: "Baú Mítico", cost: 120, minPrize: 100, maxPrize: 200 },
-            { id: 9, name: "Baú Supremo", cost: 250, minPrize: 200, maxPrize: 450 },
-            { id: 10, name: "Baú Lendário", cost: 500, minPrize: 400, maxPrize: 900 }
+            { id: 1, name: "Baú Inicial", cost: 1, prizes: [1, 2, 3] },
+            { id: 2, name: "Baú Simples", cost: 5, prizes: [2, 3, 4, 7, 9, 12] },
+            { id: 3, name: "Baú de Bronze", cost: 10, prizes: [6, 8, 9, 12, 15, 20] },
+            { id: 4, name: "Baú de Prata", cost: 20, prizes: [16, 18, 19, 22, 25, 30] },
+            { id: 5, name: "Baú de Ouro", cost: 40, prizes: [36, 38, 39, 42, 45, 50] },
+            { id: 6, name: "Baú de Platina", cost: 60, prizes: [56, 58, 59, 62, 65, 70] },
+            { id: 7, name: "Baú Épico", cost: 80, prizes: [76, 78, 79, 82, 85, 90] },
+            { id: 8, name: "Baú Mítico", cost: 120, prizes: [116, 118, 119, 122, 125, 130] },
+            { id: 9, name: "Baú Supremo", cost: 250, prizes: [246, 248, 249, 252, 255, 260] },
+            { id: 10, name: "Baú Lendário", cost: 500, prizes: [496, 498, 499, 502, 505, 510] }
         ];
         this.maxDailyAttempts = 7;
         this.initializeEventListeners();
@@ -74,13 +74,28 @@ class LotterySystem {
         }
     }
 
-    showLotteryWinModal(lotteryName, prize) {
+    showLotteryWinModal(lotteryName, prize, cost) {
         const modal = document.getElementById('lottery-win-modal');
         const message = document.getElementById('lottery-win-message');
         const closeBtn = document.getElementById('close-lottery-modal');
 
         if (modal && message && closeBtn) {
-            message.textContent = `Você abriu o ${lotteryName} e ganhou ${prize.toFixed(5)} DET no Saldo de Gastos!`;
+            const net = prize - cost;
+            let netMessage = '';
+            let color = '';
+            if (net > 0) {
+                netMessage = `Você ganhou ${net} DET`;
+                color = 'green';
+            } else if (net < 0) {
+                netMessage = `Você perdeu ${-net} DET`;
+                color = 'red';
+            } else {
+                netMessage = 'Sem ganho ou perda';
+                color = 'gray';
+            }
+
+            message.innerHTML = `Você abriu o ${lotteryName} e ganhou ${prize} DET!<br><span style="color: ${color};">${netMessage}</span>`;
+
             modal.classList.add('active');
             this.createParticles();
 
@@ -93,7 +108,7 @@ class LotterySystem {
             }, 5000);
         } else {
             console.error('Elementos do modal de vitória não encontrados');
-            this.app.showToast(`Parabéns! Você ganhou ${prize.toFixed(5)} DET no ${lotteryName}!`, 'success');
+            this.app.showToast(`Parabéns! Você ganhou ${prize} DET no ${lotteryName}!`, 'success');
         }
     }
 
@@ -128,24 +143,33 @@ class LotterySystem {
         try {
             // Deduzir o custo do baú
             this.app.userData.spendingBalance -= lottery.cost;
-            // Gerar o prêmio
-            const prize = Math.random() * (lottery.maxPrize - lottery.minPrize) + lottery.minPrize;
-            // Adicionar o prêmio ao spendingBalance e rastrear em lotteryWinnings
+
+            // Selecionar prêmio aleatório da lista
+            const prize = lottery.prizes[Math.floor(Math.random() * lottery.prizes.length)];
+
+            // Adicionar o prêmio ao spendingBalance
             this.app.userData.spendingBalance += prize;
-            this.app.userData.lotteryWinnings = (this.app.userData.lotteryWinnings || 0) + prize;
+
+            // Calcular net e ajustar lotteryWinnings
+            const net = prize - lottery.cost;
+            if (net > 0) {
+                this.app.userData.lotteryWinnings = (this.app.userData.lotteryWinnings || 0) + net;
+            } else {
+                this.app.userData.lotteryWinnings = Math.max(0, (this.app.userData.lotteryWinnings || 0) + net);
+            }
 
             // Incrementar tentativas
             this.app.userData.lotteryAttempts[lotteryId].count += 1;
 
             // Registrar transações separadas para custo e prêmio
             this.app.addTransaction('lottery', `Sorteio ${lottery.name}: Custo ${lottery.cost} DET`, -lottery.cost);
-            this.app.addTransaction('lottery', `Sorteio ${lottery.name}: Prêmio ${prize.toFixed(5)} DET`, prize);
+            this.app.addTransaction('lottery', `Sorteio ${lottery.name}: Prêmio ${prize} DET`, prize);
 
             this.app.saveUserData();
             this.app.updateUI();
 
-            this.showLotteryWinModal(lottery.name, prize);
-            console.log(`Sorteio ${lottery.name} concluído: Custo ${lottery.cost} DET, Prêmio ${prize.toFixed(5)} DET, Resultado líquido: ${(prize - lottery.cost).toFixed(5)} DET`);
+            this.showLotteryWinModal(lottery.name, prize, lottery.cost);
+            console.log(`Sorteio ${lottery.name} concluído: Custo ${lottery.cost} DET, Prêmio ${prize} DET, Resultado líquido: ${net} DET`);
         } catch (error) {
             console.error('Erro ao processar sorteio:', error);
             this.app.showToast('Erro ao processar o sorteio. Tente novamente.', 'error');

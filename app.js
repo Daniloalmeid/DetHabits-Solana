@@ -375,19 +375,22 @@ class DetHabitsApp {
         }
     }
 
-    transferLotteryWinningsToTotal() {
-        console.log('Transferindo ganhos de sorteios para Saldo Total...');
+    transferLotteryWinningsToTotal(amount) {
+        console.log('Transferindo ganhos de sorteios para Saldo Total...', { amount });
         try {
-            const amount = this.userData.lotteryWinnings || 0;
-            if (amount <= 0) {
-                throw new Error('Nenhum ganho de sorteios disponível para transferência.');
+            amount = parseFloat(amount.toFixed(5));
+            if (isNaN(amount) || amount <= 0) {
+                throw new Error('Por favor, insira uma quantidade válida (positivo).');
             }
-            if (amount > this.userData.spendingBalance) {
-                throw new Error(`Saldo de Gastos insuficiente. Você tem ${this.userData.spendingBalance.toFixed(5)} DET, mas tentou transferir ${amount.toFixed(5)} DET.`);
+            if (amount > (this.userData.lotteryWinnings || 0)) {
+                throw new Error(`Quantidade excede os ganhos de sorteios. Você tem ${(this.userData.lotteryWinnings || 0).toFixed(5)} DET em ganhos.`);
+            }
+            if (amount > (this.userData.spendingBalance || 0)) {
+                throw new Error(`Saldo de Gastos insuficiente. Você tem ${(this.userData.spendingBalance || 0).toFixed(5)} DET, mas tentou transferir ${amount.toFixed(5)} DET.`);
             }
             this.userData.spendingBalance -= amount;
             this.userData.totalBalance = (this.userData.totalBalance || 0) + amount;
-            this.userData.lotteryWinnings = 0;
+            this.userData.lotteryWinnings = (this.userData.lotteryWinnings || 0) - amount;
             this.addTransaction('transfer', `Transferência de Ganhos de Sorteios para Saldo Total: ${amount.toFixed(5)} DET`, amount);
             this.saveUserData();
             this.updateUI();
@@ -1406,13 +1409,25 @@ class DetHabitsApp {
 
         const transferLotteryBtn = document.getElementById('transfer-lottery-btn');
         if (transferLotteryBtn) {
-            transferLotteryBtn.addEventListener('click', () => {
-                try {
-                    this.transferLotteryWinningsToTotal();
-                } catch (error) {
-                    this.showToast(error.message, 'error');
-                }
-            });
+            // Remover qualquer listener existente para evitar duplicação
+            transferLotteryBtn.replaceWith(transferLotteryBtn.cloneNode(true));
+            const newTransferLotteryBtn = document.getElementById('transfer-lottery-btn');
+            const transferAmountInput = document.getElementById('transfer-amount-input');
+            if (transferAmountInput) {
+                newTransferLotteryBtn.addEventListener('click', () => {
+                    const amount = parseFloat(transferAmountInput.value);
+                    if (amount && amount > 0) {
+                        try {
+                            this.transferLotteryWinningsToTotal(amount);
+                            transferAmountInput.value = '';
+                        } catch (error) {
+                            this.showToast(error.message, 'error');
+                        }
+                    } else {
+                        this.showToast('Por favor, insira uma quantidade válida.', 'error');
+                    }
+                });
+            }
         }
     }
 }
