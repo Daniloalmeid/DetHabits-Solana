@@ -97,3 +97,16 @@ app.post('/withdraw', async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Servidor rodando na porta ${PORT}`));
+console.log('Saldo da conta de token:', await connection.getTokenAccountBalance(centralTokenAccount));
+
+console.log('Conta de token usada:', centralTokenAccount.toBase58());
+const accountInfo = await connection.getAccountInfo(centralTokenAccount);
+if (accountInfo) {
+    const data = AccountLayout.decode(accountInfo.data);
+    const mintInfo = await connection.getAccountInfo(TOKEN_MINT_ADDRESS);
+    const decimals = mintInfo ? mintInfo.data.readUInt8(44) : 6;
+    const balance = data.amount.toString() / Math.pow(10, decimals);
+    console.log('Saldo da conta de token:', balance, 'DET');
+} else {
+    console.log('Saldo da conta de token: 0 DET (conta não encontrada)');
+}
